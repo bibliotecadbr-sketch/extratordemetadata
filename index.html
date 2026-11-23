@@ -33,6 +33,15 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
 .meta-value{overflow-wrap:anywhere;color:#f1f5fa}
 .meta-line{margin:5px 0}
 @media(max-width:760px){.grid,.rss-layout{grid-template-columns:1fr}main{margin-top:14px}.card{padding:15px}}
+
+.editable-grid{max-height:440px;overflow:auto;border:1px solid var(--border,#40536d);border-radius:10px;margin:8px 0 18px}
+.editable-grid table{width:100%;border-collapse:collapse;min-width:640px}
+.editable-grid th{position:sticky;top:0;background:#30445f;z-index:1;text-align:left;padding:9px;font-size:13px}
+.editable-grid td{border-top:1px solid rgba(150,170,195,.22);padding:4px}
+.editable-grid input{width:100%;min-width:0;padding:8px 9px;border:1px solid transparent;background:transparent;color:inherit;border-radius:5px}
+.editable-grid input:focus{border-color:#ff821f;outline:none;background:rgba(255,255,255,.06)}
+.editable-grid .delete-row{padding:6px 9px;background:#65404a}
+.table-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0}
 </style>
 </head>
 <body>
@@ -161,10 +170,12 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
 <section class="card">
 <h2>5. Tablas de etiquetas automáticas <span class="pill">Editables</span></h2>
 <p class="small">Edita las filas separadas por tabuladores. Tabla 1: código del enlace, tipo y categoría. Tabla 2: abreviatura bíblica y nombre completo. Los cambios se guardan en este navegador.</p>
-<label for="videoMapTable">Tabla 1 · Código | Tipo | Categoría</label>
-<textarea id="videoMapTable" style="min-height:240px;font-family:monospace;font-size:12px" spellcheck="false"></textarea>
-<label for="bibleMapTable">Tabla 2 · Abreviatura | Nombre completo</label>
-<textarea id="bibleMapTable" style="min-height:240px;font-family:monospace;font-size:12px" spellcheck="false"></textarea>
+<label>Tabla 1 · Código | Tipo | Categoría</label>
+<div class="table-toolbar"><button type="button" class="secondary" id="addVideoRow">+ Agregar fila</button><span class="small">Deja Código vacío para continuar con el código de la fila anterior.</span></div>
+<div class="editable-grid" id="videoGrid"></div>
+<label>Tabla 2 · Abreviatura | Nombre completo</label>
+<div class="table-toolbar"><button type="button" class="secondary" id="addBibleRow">+ Agregar fila</button></div>
+<div class="editable-grid" id="bibleGrid"></div>
 <div class="toolbar"><button id="saveTagTables">Guardar tablas</button><button class="secondary" id="resetTagTables">Restaurar tablas iniciales</button></div>
 <div class="status" id="tagTableStatus" aria-live="polite"></div>
 <label for="generatedLabels">Etiquetas detectadas</label>
@@ -193,34 +204,51 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   let rssItems = [];
 
   let selectedRss = null;
-  const DEFAULT_VIDEO_ROWS = [["StudioMonthlyPrograms", "Programas mensuales", "JW Broadcasting"], ["StudioTalks", "Discursos", "JW Broadcasting"], ["StudioNewsReports", "Noticias y anuncios", "JW Broadcasting"], ["BJF", "Videos educativos", "Niños"], ["BJF", "Canciones", "Niños"], ["BJF", "Animaciones", "Niños"], ["TeenSpiritualGrowth", "Progreso espiritual", "Jóvenes"], ["TeenSpiritualGrowth", "Vida social", "Jóvenes"], ["TeenGoals", "Metas", "Jóvenes"], ["TeenGoals", "Entrevistas y experiencias", "Jóvenes"], ["TeenGoals", "Producciones audiovisuales", "Jóvenes"], ["TeenGoals", "Retos familiares", "Familia"], ["TeenGoals", "El noviazgo y el matrimonio", "Familia"], ["TeenGoals", "Adoración en familia", "Familia"], ["TeenGoals", "Producciones audiovisuales", "Familia"], ["VODPgmEvtMorningWorship", "Adoración matutina", "Programas espirituales"], ["VODPgmEvtMorningWorship", "Programas especiales", "Programas espirituales"], ["VODPgmEvtGilead", "Graduación de Galaad", "Programas espirituales"], ["VODPgmEvtAnnMtg", "Reunión anual", "Programas espirituales"], ["2026Convention", "Asamblea regional 2026 \| Felices para siempre", "Programas espirituales"], ["2026Convention", "Asamblea regional 2025 \| Adoración pura", "Programas espirituales"], ["2026Convention", "Asamblea regional 2024 \| ¡Prediquemos las buenas noticias!", "Programas espirituales"], ["2023Convention", "Asamblea regional 2023 \| \"Tengan paciencia\"", "Programas espirituales"], ["2022Convention", "Asamblea regional 2022 \| “Busquen la paz”", "Programas espirituales"], ["2022Convention", "Asamblea regional 2021 \| \"Poderosos gracias a la fe\"", "Programas espirituales"], ["2022Convention", "Asamblea regional 2020 \| ¡Alégrense siempre!", "Programas espirituales"], ["2022Convention", "Asamblea regional 2019 \| “El amor nunca falla”", "Programas espirituales"], ["2022Convention", "Asamblea regional 2018 \| ¡Sea valiente!", "Programas espirituales"], ["2022Convention", "Asamblea regional 2017 \| ¡No se rinda!", "Programas espirituales"], ["2022Convention", "Asamblea regional 2016 \| Seamos leales a Jehová", "Programas espirituales"], ["2022Convention", "Asamblea regional 2015 \| Imitemos a Cristo", "Programas espirituales"], ["2022Convention", "Asamblea regional 2014 \| Sigamos buscando primero el Reino de Dios", "Programas espirituales"], ["2022Convention", "Traducción", "Qué hacemos"], ["2022Convention", "Producción de programas en audio y video", "Qué hacemos"], ["2022Convention", "Producción y distribución de publicaciones", "Qué hacemos"], ["2022Convention", "Obras de construcción", "Qué hacemos"], ["VODActivitiesReliefWork", "Labores de socorro", "Qué hacemos"], ["VODActivitiesReliefWork", "Escuelas bíblicas y capacitación", "Qué hacemos"], ["VODActivitiesReliefWork", "Eventos especiales", "Qué hacemos"], ["VODActivitiesReliefWork", "Reuniones de entre semana", "Nuestras reuniones y ministerio"], ["VODMinistryTools", "Ayudas para la predicación", "Nuestras reuniones y ministerio"], ["VODMinistryTools", "Enseñanzas importantes de la Biblia", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Mejore sus habilidades en el ministerio", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Maneras de predicar", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Formas de ampliar nuestro ministerio", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Reuniones, asambleas de circuito y asambleas regionales", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Ideas para conversar (2016-2023)", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Informes de diferentes partes del mundo", "Nuestra organización"], ["VODMinistryImproveSkills", "Betel", "Nuestra organización"], ["AccomplishMinistry", "Organizados para efectuar nuestra predicación", "Nuestra organización"], ["AccomplishMinistry", "Historia", "Nuestra organización"], ["AccomplishMinistry", "Asuntos legales", "Nuestra organización"], ["VODOrgBloodlessMedicine", "Medicina sin sangre", "Nuestra organización"], ["VODOrgBloodlessMedicine", "Libros de la Biblia", "La Biblia"], ["VODBibleReadingStudy", "La lectura y el estudio de la Biblia", "La Biblia"], ["VODBibleTeachings", "Enseñanzas bíblicas", "La Biblia"], ["VODBibleTeachings", "Relatos bíblicos", "La Biblia"], ["VODBibleTeachings", "Personas, lugares y cosas", "La Biblia"], ["VODBibleTeachings", "Traducciones de la Biblia", "La Biblia"], ["VODBiblePrinciples", "Siga los consejos de la Biblia", "La Biblia"], ["VODBiblePrinciples", "La creación", "La Biblia"], ["DramasGoodNews", "Las buenas noticias según Jesús", "Producciones audiovisuales"], ["VODMoviesBibleTimes", "De tiempos bíblicos", "Producciones audiovisuales"], ["VODMoviesModernDay", "De la actualidad", "Producciones audiovisuales"], ["VODMoviesExtras", "Extras", "Producciones audiovisuales"], ["VODMoviesExtras", "Animaciones", "Producciones audiovisuales"], ["VODMoviesExtras", "Seamos mejores lectores y maestros", "Series"], ["SeriesBJFSongs", "Hazte amigo de Jehová (canciones)", "Series"], ["SeriesBJFLessons", "Hazte amigo de Jehová (videos)", "Series"], ["SeriesBJFLessons", "Descubramos más tesoros", "Series"], ["SeriesBJFLessons", "Disfrute de la vida (videos)", "Series"], ["SeriesBibleTeachings", "Enseñanzas importantes de la Biblia", "Series"], ["SeriesBibleTeachings", "Secretos para un matrimonio feliz", "Series"], ["SeriesBibleTeachings", "Ejemplos de fe", "Series"], ["SeriesBibleTeachings", "Información sobre los libros de la Biblia", "Series"], ["SeriesIronSharpens", "El hierro afila el hierro", "Series"], ["SeriesJehovahsFriends", "Aprende de los amigos de Jehová", "Series"], ["SeriesJehovahsFriends", "Aprendamos de ellos", "Series"], ["SeriesWTLessons", "Lecciones de La Atalaya", "Series"], ["SeriesWTLessons", "Hacer discípulos: una obra de amor", "Series"], ["SeriesWTLessons", "Cuando eres adolescente", "Series"], ["SeriesWTLessons", "Rita y Coral", "Series"], ["SeriesOrgAccomplishments", "Logros de la organización", "Series"], ["SeriesOrgAccomplishments", "Del pasado al presente", "Series"], ["SeriesOrgAccomplishments", "Adoración pura \| Presentación de los capítulos", "Series"], ["SeriesOrgAccomplishments", "Razones para tener fe", "Series"], ["SeriesOrgAccomplishments", "La Biblia les cambió la vida", "Series"], ["SeriesGoodNews", "Las buenas noticias según Jesús", "Series"], ["SeriesGoodNews", "La verdad cambia la vida de las personas", "Series"], ["SeriesGoodNews", "Opiniones sobre el origen de la vida", "Series"], ["SeriesGoodNews", "Ver todo", "Series"], ["SeriesWasItDesigned", "¿Lo diseñó alguien?", "Series"], ["SeriesWebsiteAppHelp", "Ayuda del sitio web y la aplicación", "Series"], ["SeriesWebsiteAppHelp", "Lo que opinan otros jóvenes", "Series"], ["SeriesWebsiteAppHelp", "¿Qué ha sido de ellos?", "Series"], ["SeriesWhiteboard", "La pizarra animada", "Series"], ["SeriesWhiteboard", "La verdad cambia la vida de las personas", "Entrevistas y experiencias"], ["SeriesWhiteboard", "Las recompensas del servicio sagrado", "Entrevistas y experiencias"], ["VODIntExpEndurance", "Se enfrentan a pruebas", "Entrevistas y experiencias"], ["VODIntExpEndurance", "Jóvenes", "Entrevistas y experiencias"], ["VODIntExpEndurance", "Ciencia", "Entrevistas y experiencias"], ["VODIntExpEndurance", "De nuestros archivos", "Entrevistas y experiencias"], ["VODOriginalSongs", "Música", "Canciones originales"], ["VODSJJMeetings", "Música", "Cantemos con gozo a Jehová (para las reuniones)"], ["SeriesLoveMinistry", "Disfruta del ministerio", "Series"]];
+  const DEFAULT_VIDEO_ROWS = [["StudioMonthlyPrograms", "Programas mensuales", "JW Broadcasting"], ["StudioTalks", "Discursos", "JW Broadcasting"], ["StudioNewsReports", "Noticias y anuncios", "JW Broadcasting"], ["BJF", "Videos educativos", "Niños"], ["", "Canciones", "Niños"], ["", "Animaciones", "Niños"], ["TeenSpiritualGrowth", "Progreso espiritual", "Jóvenes"], ["", "Vida social", "Jóvenes"], ["TeenGoals", "Metas", "Jóvenes"], ["", "Entrevistas y experiencias", "Jóvenes"], ["", "Producciones audiovisuales", "Jóvenes"], ["", "Retos familiares", "Familia"], ["", "El noviazgo y el matrimonio", "Familia"], ["", "Adoración en familia", "Familia"], ["", "Producciones audiovisuales", "Familia"], ["VODPgmEvtMorningWorship", "Adoración matutina", "Programas espirituales"], ["", "Programas especiales", "Programas espirituales"], ["VODPgmEvtGilead", "Graduación de Galaad", "Programas espirituales"], ["VODPgmEvtAnnMtg", "Reunión anual", "Programas espirituales"], ["2026Convention", "Asamblea regional 2026 | Felices para siempre", "Programas espirituales"], ["", "Asamblea regional 2025 | Adoración pura", "Programas espirituales"], ["", "Asamblea regional 2024 | ¡Prediquemos las buenas noticias!", "Programas espirituales"], ["2023Convention", "Asamblea regional 2023 | \"Tengan paciencia\"", "Programas espirituales"], ["2022Convention", "Asamblea regional 2022 | “Busquen la paz”", "Programas espirituales"], ["", "Asamblea regional 2021 | \"Poderosos gracias a la fe\"", "Programas espirituales"], ["", "Asamblea regional 2020 | ¡Alégrense siempre!", "Programas espirituales"], ["", "Asamblea regional 2019 | “El amor nunca falla”", "Programas espirituales"], ["", "Asamblea regional 2018 | ¡Sea valiente!", "Programas espirituales"], ["", "Asamblea regional 2017 | ¡No se rinda!", "Programas espirituales"], ["", "Asamblea regional 2016 | Seamos leales a Jehová", "Programas espirituales"], ["", "Asamblea regional 2015 | Imitemos a Cristo", "Programas espirituales"], ["", "Asamblea regional 2014 | Sigamos buscando primero el Reino de Dios", "Programas espirituales"], ["", "Traducción", "Qué hacemos"], ["", "Producción de programas en audio y video", "Qué hacemos"], ["", "Producción y distribución de publicaciones", "Qué hacemos"], ["", "Obras de construcción", "Qué hacemos"], ["VODActivitiesReliefWork", "Labores de socorro", "Qué hacemos"], ["", "Escuelas bíblicas y capacitación", "Qué hacemos"], ["", "Eventos especiales", "Qué hacemos"], ["", "Reuniones de entre semana", "Nuestras reuniones y ministerio"], ["VODMinistryTools", "Ayudas para la predicación", "Nuestras reuniones y ministerio"], ["", "Enseñanzas importantes de la Biblia", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Mejore sus habilidades en el ministerio", "Nuestras reuniones y ministerio"], ["", "Maneras de predicar", "Nuestras reuniones y ministerio"], ["", "Formas de ampliar nuestro ministerio", "Nuestras reuniones y ministerio"], ["", "Reuniones, asambleas de circuito y asambleas regionales", "Nuestras reuniones y ministerio"], ["", "Ideas para conversar (2016-2023)", "Nuestras reuniones y ministerio"], ["", "Informes de diferentes partes del mundo", "Nuestra organización"], ["", "Betel", "Nuestra organización"], ["AccomplishMinistry", "Organizados para efectuar nuestra predicación", "Nuestra organización"], ["", "Historia", "Nuestra organización"], ["", "Asuntos legales", "Nuestra organización"], ["VODOrgBloodlessMedicine", "Medicina sin sangre", "Nuestra organización"], ["", "Libros de la Biblia", "La Biblia"], ["VODBibleReadingStudy", "La lectura y el estudio de la Biblia", "La Biblia"], ["VODBibleTeachings", "Enseñanzas bíblicas", "La Biblia"], ["", "Relatos bíblicos", "La Biblia"], ["", "Personas, lugares y cosas", "La Biblia"], ["", "Traducciones de la Biblia", "La Biblia"], ["VODBiblePrinciples", "Siga los consejos de la Biblia", "La Biblia"], ["", "La creación", "La Biblia"], ["DramasGoodNews", "Las buenas noticias según Jesús", "Producciones audiovisuales"], ["VODMoviesBibleTimes", "De tiempos bíblicos", "Producciones audiovisuales"], ["VODMoviesModernDay", "De la actualidad", "Producciones audiovisuales"], ["VODMoviesExtras", "Extras", "Producciones audiovisuales"], ["", "Animaciones", "Producciones audiovisuales"], ["", "Seamos mejores lectores y maestros", "Series"], ["SeriesBJFSongs", "Hazte amigo de Jehová (canciones)", "Series"], ["SeriesBJFLessons", "Hazte amigo de Jehová (videos)", "Series"], ["", "Descubramos más tesoros", "Series"], ["", "Disfrute de la vida (videos)", "Series"], ["SeriesBibleTeachings", "Enseñanzas importantes de la Biblia", "Series"], ["", "Secretos para un matrimonio feliz", "Series"], ["", "Ejemplos de fe", "Series"], ["", "Información sobre los libros de la Biblia", "Series"], ["SeriesIronSharpens", "El hierro afila el hierro", "Series"], ["SeriesJehovahsFriends", "Aprende de los amigos de Jehová", "Series"], ["", "Aprendamos de ellos", "Series"], ["SeriesWTLessons", "Lecciones de La Atalaya", "Series"], ["", "Hacer discípulos: una obra de amor", "Series"], ["", "Cuando eres adolescente", "Series"], ["", "Rita y Coral", "Series"], ["SeriesOrgAccomplishments", "Logros de la organización", "Series"], ["", "Del pasado al presente", "Series"], ["", "Adoración pura | Presentación de los capítulos", "Series"], ["", "Razones para tener fe", "Series"], ["", "La Biblia les cambió la vida", "Series"], ["SeriesGoodNews", "Las buenas noticias según Jesús", "Series"], ["", "La verdad cambia la vida de las personas", "Series"], ["", "Opiniones sobre el origen de la vida", "Series"], ["", "Ver todo", "Series"], ["SeriesWasItDesigned", "¿Lo diseñó alguien?", "Series"], ["SeriesWebsiteAppHelp", "Ayuda del sitio web y la aplicación", "Series"], ["", "Lo que opinan otros jóvenes", "Series"], ["", "¿Qué ha sido de ellos?", "Series"], ["SeriesWhiteboard", "La pizarra animada", "Series"], ["", "La verdad cambia la vida de las personas", "Entrevistas y experiencias"], ["", "Las recompensas del servicio sagrado", "Entrevistas y experiencias"], ["VODIntExpEndurance", "Se enfrentan a pruebas", "Entrevistas y experiencias"], ["", "Jóvenes", "Entrevistas y experiencias"], ["", "Ciencia", "Entrevistas y experiencias"], ["", "De nuestros archivos", "Entrevistas y experiencias"], ["VODOriginalSongs", "Música", "Canciones originales"], ["VODSJJMeetings", "Música", "Cantemos con gozo a Jehová (para las reuniones)"], ["SeriesLoveMinistry", "Disfruta del ministerio", "Series"]];
   const DEFAULT_BIBLE_ROWS = [["Gén.", "Génesis"], ["Éxo.", "Éxodo"], ["Lev.", "Levítico"], ["Núm.", "Números"], ["Deut.", "Deuteronomio"], ["Jos.", "Josué"], ["Jue.", "Jueces"], ["Rut.", "Rut"], ["1 Sam.", "1 Samuel"], ["2 Sam.", "2 Samuel"], ["1 Rey.", "1 Reyes"], ["2 Rey.", "2 Reyes"], ["1 Cró.", "1 Crónicas"], ["2 Cró.", "2 Crónicas"], ["Esd.", "Esdras"], ["Neh.", "Nehemías"], ["Est.", "Ester"], ["Job", "Job"], ["Sal.", "Salmos"], ["Prov.", "Proverbios"], ["Ecl.", "Eclesiastés"], ["Cant. de Cant..", "El Cantar de los Cantares"], ["Isa.", "Isaías"], ["Jer.", "Jeremías"], ["Lam.", "Lamentaciones"], ["Eze.", "Ezequiel"], ["Dan.", "Daniel"], ["Ose.", "Oseas"], ["Joe.", "Joel"], ["Amó.", "Amós"], ["Abd.", "Abdías"], ["Jon.", "Jonás"], ["Miq.", "Miqueas"], ["Nah.", "Nahúm"], ["Hab.", "Habacuc"], ["Sof.", "Sofonías"], ["Age.", "Ageo"], ["Zac.", "Zacarías"], ["Mal.", "Malaquías"], ["Mat.", "Mateo"], ["Mar.", "Marcos"], ["Luc.", "Lucas"], ["Juan", "Juan"], ["Hec.", "Hechos"], ["Rom.", "Romanos"], ["1 Cor.", "1 Corintios"], ["2 Cor.", "2 Corintios"], ["Gál.", "Gálatas"], ["Efe.", "Efesios"], ["Filip.", "Filipenses"], ["Col.", "Colosenses"], ["1 Tes.", "1 Tesalonicenses"], ["2 Tes.", "2 Tesalonicenses"], ["1 Tim.", "1 Timoteo"], ["2 Tim.", "2 Timoteo"], ["Tito.", "Tito"], ["File.", "Filemón"], ["Heb.", "Hebreos"], ["Sant.", "Santiago"], ["1 Ped.", "1 Pedro"], ["2 Ped.", "2 Pedro"], ["1 Jua.", "1 Juan"], ["2 Jua.", "2 Juan"], ["3 Jua.", "3 Juan"], ["Jud.", "Judas"], ["Apoc.", "Apocalipsis"]];
-  const rowsToText = rows => rows.map(r => r.join('\t')).join('\n');
-  function readRows(id, count) {
-    return $(id).value.split(/\r?\n/).map(line => line.split('\t').map(x => x.trim()))
-      .filter(r => r.some(Boolean)).map(r => Array.from({length:count}, (_,i) => r[i] || ''));
+  function renderGrid(id, rows, headers) {
+    const host=$(id);
+    host.innerHTML='<table><thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'<th>Acción</th></tr></thead><tbody>'+
+      rows.map((row,i)=>'<tr>'+headers.map((h,j)=>'<td><input aria-label="'+h+' fila '+(i+1)+'" data-col="'+j+'" value="'+esc(row[j]||'')+'"></td>').join('')+
+      '<td><button type="button" class="delete-row" data-delete="'+i+'" title="Eliminar fila">×</button></td></tr>').join('')+
+      '</tbody></table>';
+    host.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{}));
+    host.querySelectorAll('[data-delete]').forEach(btn=>btn.addEventListener('click',()=>{
+      const current=readGrid(id,headers.length); current.splice(Number(btn.dataset.delete),1); renderGrid(id,current,headers);
+    }));
+  }
+  function readGrid(id,count) {
+    return Array.from($(id).querySelectorAll('tbody tr')).map(tr=>
+      Array.from({length:count},(_,i)=>tr.querySelector('[data-col="'+i+'"]')?.value.trim()||'')
+    ).filter(r=>r.some(Boolean));
+  }
+  function readRows(id,count) {
+    const gridId=id==='videoMapTable'?'videoGrid':'bibleGrid';
+    const rows=readGrid(gridId,count);
+    if(count===3) {
+      let last='';
+      return rows.map(r=>{if(r[0])last=r[0];return [last,r[1],r[2]];});
+    }
+    return rows;
   }
   function loadLabelTables() {
     let v=DEFAULT_VIDEO_ROWS, b=DEFAULT_BIBLE_ROWS;
-    try { v=JSON.parse(localStorage.getItem('jw_label_video_v1')) || v; b=JSON.parse(localStorage.getItem('jw_label_bible_v1')) || b; } catch(e) {}
-    $('videoMapTable').value=rowsToText(v); $('bibleMapTable').value=rowsToText(b);
+    try {
+      const savedV=JSON.parse(localStorage.getItem('jw_label_video_v1'));
+      const savedB=JSON.parse(localStorage.getItem('jw_label_bible_v1'));
+      if(Array.isArray(savedV)&&savedV.length)v=savedV;
+      if(Array.isArray(savedB)&&savedB.length)b=savedB;
+    } catch(e) {}
+    renderGrid('videoGrid',v,['Código','Tipo','Categoría']);
+    renderGrid('bibleGrid',b,['Abreviatura','Nombre completo']);
   }
   function saveLabelTables() {
-    localStorage.setItem('jw_label_video_v1', JSON.stringify(readRows('videoMapTable',3)));
-    localStorage.setItem('jw_label_bible_v1', JSON.stringify(readRows('bibleMapTable',2)));
-    $('tagTableStatus').textContent='Tablas guardadas. Se actualizarán las etiquetas de la publicación seleccionada.';
-    if (selectedRss) updateLabels(selectedRss);
-    loadLabelTables();
-  $('saveTagTables').addEventListener('click', saveLabelTables);
-  $('resetTagTables').addEventListener('click', () => {
-    if(confirm('¿Restaurar las tablas iniciales?')) {
-      localStorage.removeItem('jw_label_video_v1'); localStorage.removeItem('jw_label_bible_v1');
-      loadLabelTables(); populateVideoFilters(); renderRssList();
-      if(selectedRss) updateLabels(selectedRss);
-      $('tagTableStatus').textContent='Tablas iniciales restauradas.';
-    }
-  });
-  populateVideoFilters(); renderRssList();
+    const videoRows=readGrid('videoGrid',3), bibleRows=readGrid('bibleGrid',2);
+    localStorage.setItem('jw_label_video_v1',JSON.stringify(videoRows));
+    localStorage.setItem('jw_label_bible_v1',JSON.stringify(bibleRows));
+    $('tagTableStatus').textContent='Tablas guardadas correctamente en este navegador.';
+    if(selectedRss)updateLabels(selectedRss);
+    populateVideoFilters();renderRssList();
   }
   function tagValues(item) {
     const code=getVideoTypeKey(item), title=item.title || '';
@@ -598,6 +626,21 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   $('rssSearch').addEventListener('input', renderRssList);
   $('rssCategory').addEventListener('change', () => { updateVideoTypeFilter(); renderRssList(); });
   $('rssVideoType').addEventListener('change', renderRssList);
+  loadLabelTables();
+  $('saveTagTables').addEventListener('click', saveLabelTables);
+  $('addVideoRow').addEventListener('click',()=>{const rows=readGrid('videoGrid',3);rows.push(['','','']);renderGrid('videoGrid',rows,['Código','Tipo','Categoría']);});
+  $('addBibleRow').addEventListener('click',()=>{const rows=readGrid('bibleGrid',2);rows.push(['','']);renderGrid('bibleGrid',rows,['Abreviatura','Nombre completo']);});
+  $('resetTagTables').addEventListener('click', () => {
+    if (confirm('¿Restaurar las tablas iniciales?')) {
+      localStorage.removeItem('jw_label_video_v1');
+      localStorage.removeItem('jw_label_bible_v1');
+      loadLabelTables();
+      populateVideoFilters();
+      renderRssList();
+      if (selectedRss) updateLabels(selectedRss);
+      $('tagTableStatus').textContent='Tablas iniciales restauradas.';
+    }
+  });
   populateVideoFilters();
   $('importRssFile').addEventListener('click', ()=>$('rssFile').click());
   $('openFeed').addEventListener('click', () => { const u=$('rssUrl').value.trim(); if(u) window.open(u, '_blank', 'noopener'); });
