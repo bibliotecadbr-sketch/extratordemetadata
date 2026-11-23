@@ -57,7 +57,18 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       <div>
         <h2>📡 Publicaciones RSS</h2>
         <label for="rssSearch">Buscar publicaciones</label>
-        <input id="rssSearch" placeholder="Buscar publicaciones...">
+        <input id="rssSearch" placeholder="Buscar por título, autor o descripción...">
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label for="rssCategory">Categoría</label>
+            <select id="rssCategory"><option value="">Todas las categorías</option></select>
+          </div>
+          <div>
+            <label for="rssVideoType">Tipo de video</label>
+            <select id="rssVideoType"><option value="">Todos los tipos</option></select>
+          </div>
+        </div>
+        <div class="small" id="rssFilterCount" style="margin-top:8px">Sin publicaciones cargadas.</div>
         <div class="rss-list" id="rssList"><p class="small">Carga el RSS para mostrar las publicaciones.</p></div>
       </div>
       <div>
@@ -162,6 +173,71 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   let rssItems = [];
   let selectedRss = null;
 
+  // Catálogo de tipos y categorías tomado de la tabla proporcionada.
+  // La clave corresponde al segmento de tipo en el enlace tv.jw.org/#es/mediaitems/TIPO/...
+  const VIDEO_CATALOG = {
+    StudioMonthlyPrograms:{category:'JW Broadcasting',type:'Programas mensuales'},
+    StudioTalks:{category:'JW Broadcasting',type:'Discursos'},
+    StudioNewsReports:{category:'JW Broadcasting',type:'Noticias y anuncios'},
+    BJF:{category:'Niños',type:'Videos educativos; Canciones; Animaciones'},
+    TeenSpiritualGrowth:{category:'Jóvenes',type:'Progreso espiritual; Vida social'},
+    TeenGoals:{category:'Jóvenes',type:'Metas; Entrevistas y experiencias; Producciones audiovisuales'},
+    VODPgmEvtMorningWorship:{category:'Programas espirituales',type:'Adoración matutina; Programas especiales'},
+    VODPgmEvtGilead:{category:'Programas espirituales',type:'Graduación de Galaad'},
+    VODPgmEvtAnnMtg:{category:'Programas espirituales',type:'Reunión anual'},
+    '2026Convention':{category:'Programas espirituales',type:'Asamblea regional 2026 | Felices para siempre'},
+    '2023Convention':{category:'Programas espirituales',type:'Asambleas regionales 2023 y anteriores'},
+    VODActivitiesReliefWork:{category:'Qué hacemos',type:'Labores de socorro; Escuelas bíblicas y capacitación; Eventos especiales'},
+    VODMinistryTools:{category:'Nuestras reuniones y ministerio',type:'Ayudas para la predicación; Enseñanzas importantes de la Biblia'},
+    VODMinistryImproveSkills:{category:'Nuestras reuniones y ministerio',type:'Mejore sus habilidades en el ministerio; Maneras de predicar; Formas de ampliar nuestro ministerio; Reuniones y asambleas; Ideas para conversar'},
+    AccomplishMinistry:{category:'Nuestra organización',type:'Organizados para efectuar nuestra predicación; Historia; Asuntos legales'},
+    VODOrgBloodlessMedicine:{category:'Nuestra organización',type:'Medicina sin sangre'},
+    VODBibleReadingStudy:{category:'La Biblia',type:'Libros de la Biblia; La lectura y el estudio de la Biblia'},
+    VODBibleTeachings:{category:'La Biblia',type:'Enseñanzas bíblicas; Relatos bíblicos; Personas, lugares y cosas; Traducciones de la Biblia'},
+    VODBiblePrinciples:{category:'La Biblia',type:'Siga los consejos de la Biblia; La creación'},
+    DramasGoodNews:{category:'Producciones audiovisuales',type:'Las buenas noticias según Jesús'},
+    VODMoviesBibleTimes:{category:'Producciones audiovisuales',type:'De tiempos bíblicos'},
+    VODMoviesModernDay:{category:'Producciones audiovisuales',type:'De la actualidad'},
+    VODMoviesExtras:{category:'Producciones audiovisuales',type:'Extras; Animaciones'},
+    SeriesBJFSongs:{category:'Series',type:'Hazte amigo de Jehová (canciones)'},
+    SeriesBJFLessons:{category:'Series',type:'Hazte amigo de Jehová (videos)'},
+    SeriesBibleTeachings:{category:'Series',type:'Enseñanzas importantes de la Biblia; Secretos para un matrimonio feliz; Ejemplos de fe; Información sobre los libros de la Biblia'},
+    SeriesIronSharpens:{category:'Series',type:'El hierro afila el hierro'},
+    SeriesJehovahsFriends:{category:'Series',type:'Aprende de los amigos de Jehová; Aprendamos de ellos'},
+    SeriesWTLessons:{category:'Series',type:'Lecciones de La Atalaya; Hacer discípulos: una obra de amor; Cuando eres adolescente; Rita y Coral'},
+    SeriesOrgAccomplishments:{category:'Series',type:'Logros de la organización; Del pasado al presente; Adoración pura; Razones para tener fe; La Biblia les cambió la vida'},
+    SeriesGoodNews:{category:'Series',type:'Las buenas noticias según Jesús; La verdad cambia la vida de las personas; Opiniones sobre el origen de la vida; Ver todo'},
+    SeriesWasItDesigned:{category:'Series',type:'¿Lo diseñó alguien?'},
+    SeriesWebsiteAppHelp:{category:'Series',type:'Ayuda del sitio web y la aplicación'},
+    SeriesWhiteboard:{category:'Series',type:'La pizarra animada'},
+    VODIntExpEndurance:{category:'Entrevistas y experiencias',type:'Se enfrentan a pruebas; Jóvenes; Ciencia; De nuestros archivos'},
+    VODOriginalSongs:{category:'Canciones originales',type:'Música'},
+    VODSJJMeetings:{category:'Cantemos con gozo a Jehová (para las reuniones)',type:'Música'},
+    SeriesLoveMinistry:{category:'Series',type:'Disfruta del ministerio'}
+  };
+  function getVideoTypeKey(item) {
+    const link = item.link || '';
+    const match = link.match(/mediaitems\\/([^/?#]+)/i);
+    return match ? decodeURIComponent(match[1]) : '';
+  }
+  function getVideoCatalog(item) {
+    const key = getVideoTypeKey(item);
+    const found = VIDEO_CATALOG[key];
+    return {key, category:found?.category || 'Sin clasificar', type:found?.type || 'Tipo no incluido en la tabla'};
+  }
+  function populateVideoFilters() {
+    const categories = [...new Set(Object.values(VIDEO_CATALOG).map(x=>x.category))].sort((a,b)=>a.localeCompare(b,'es'));
+    $('rssCategory').innerHTML = '<option value="">Todas las categorías</option>' + categories.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+    updateVideoTypeFilter();
+  }
+  function updateVideoTypeFilter() {
+    const category = $('rssCategory').value;
+    const types = [...new Set(Object.values(VIDEO_CATALOG)
+      .filter(x=>!category || x.category===category)
+      .flatMap(x=>x.type.split(';').map(t=>t.trim()).filter(Boolean)))].sort((a,b)=>a.localeCompare(b,'es'));
+    $('rssVideoType').innerHTML = '<option value="">Todos los tipos</option>' + types.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  }
+
   function firstByLocalName(parent, names) {
     const wanted = names.map(x => x.toLowerCase());
     for (const el of Array.from(parent.getElementsByTagName('*'))) {
@@ -258,7 +334,16 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   }
   function renderRssList() {
     const query = $('rssSearch').value.trim().toLocaleLowerCase('es');
-    const filtered = rssItems.filter(x => (x.title+' '+x.author+' '+x.description).toLocaleLowerCase('es').includes(query));
+    const category = $('rssCategory').value;
+    const videoType = $('rssVideoType').value;
+    const filtered = rssItems.filter(x => {
+      const meta = getVideoCatalog(x);
+      const textMatch = (x.title+' '+x.author+' '+x.description+' '+meta.key+' '+meta.category+' '+meta.type).toLocaleLowerCase('es').includes(query);
+      const categoryMatch = !category || meta.category === category;
+      const typeMatch = !videoType || meta.type.split(';').map(t=>t.trim()).includes(videoType);
+      return textMatch && categoryMatch && typeMatch;
+    });
+    $('rssFilterCount').textContent = `${filtered.length} de ${rssItems.length} publicaciones`;
     $('rssList').innerHTML = '';
     if (!filtered.length) {
       $('rssList').innerHTML = '<p class="small">No hay publicaciones que coincidan.</p>';
@@ -268,7 +353,8 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'rss-item' + (selectedRss === item ? ' active' : '');
-      b.innerHTML = esc(item.title) + '<span class="rss-date">' + esc(displayDate(item.date)) + '</span>';
+      const meta = getVideoCatalog(item);
+      b.innerHTML = esc(item.title) + '<span class="rss-date">' + esc(displayDate(item.date)) + ' · ' + esc(meta.category) + ' · ' + esc(meta.key || 'Tipo desconocido') + '</span>';
       b.addEventListener('click', () => selectRssItem(item));
       $('rssList').appendChild(b);
     });
@@ -280,6 +366,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       <div class="meta-line"><strong>Fecha:</strong> <span class="meta-value">${esc(displayDate(item.date))}</span></div>
       <div class="meta-line"><strong>Autor:</strong> <span class="meta-value">${esc(item.author || 'No indicado')}</span></div>
       <div class="meta-line"><strong>GUID:</strong> <span class="meta-value">${esc(item.guid || 'No indicado')}</span></div>
+      <div class="meta-line"><strong>Tipo detectado:</strong> <span class="meta-value">${esc(getVideoCatalog(item).key || 'No identificado')}</span></div>
+      <div class="meta-line"><strong>Categoría:</strong> <span class="meta-value">${esc(getVideoCatalog(item).category)}</span></div>
+      <div class="meta-line"><strong>Subtipo:</strong> <span class="meta-value">${esc(getVideoCatalog(item).type)}</span></div>
       <div class="meta-line"><strong>Enlace:</strong><br><span class="meta-value">${esc(item.link || 'No indicado')}</span></div>
       <div class="meta-line"><strong>Tipo:</strong> <span class="meta-value">${esc(item.type || 'No indicado')}</span></div>
       <div class="meta-line"><strong>Archivo principal:</strong><br><span class="meta-value">${esc(item.file || 'No indicado')}</span></div>
@@ -425,6 +514,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   $('copyHtml').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(makeHtml());setStatus('editorStatus','HTML copiado.');}catch(e){alert('No se pudo copiar. Descarga el archivo HTML.');}});
   $('loadRss').addEventListener('click', loadRss);
   $('rssSearch').addEventListener('input', renderRssList);
+  $('rssCategory').addEventListener('change', () => { updateVideoTypeFilter(); renderRssList(); });
+  $('rssVideoType').addEventListener('change', renderRssList);
+  populateVideoFilters();
   $('importRssFile').addEventListener('click', ()=>$('rssFile').click());
   $('openFeed').addEventListener('click', () => { const u=$('rssUrl').value.trim(); if(u) window.open(u, '_blank', 'noopener'); });
   $('rssFile').addEventListener('change', async e => {
