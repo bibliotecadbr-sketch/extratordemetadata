@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14243a">
+<title>Extractor de Texto JW.org</title>
+<style>
+:root{--navy:#1d2b43;--blue:#f47721;--bg:#101b2d;--card:#1d2b43;--text:#f2f5fa;--muted:#a9bad0;--line:#40516a;--accent:#30445f;--good:#72d6a4;--warn:#ffd27a}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:#172333;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{background:linear-gradient(120deg,#14243a,#234d75);color:white;padding:24px max(18px,calc((100% - 1120px)/2))}
+header h1{margin:0;font-size:clamp(23px,4vw,32px)}header p{margin:6px 0 0;color:#d8e6f5}
+main{max-width:1120px;margin:22px auto;padding:0 16px 40px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px;color:var(--text);box-shadow:0 4px 16px #1c35501a;margin-bottom:16px}
+h2{font-size:20px;margin:0 0 12px;color:var(--text)}h3{font-size:15px;margin:16px 0 7px}
+label{display:block;font-weight:650;margin:10px 0 5px}input,textarea,select{width:100%;border:1px solid var(--line);border-radius:9px;padding:11px 12px;font:inherit;background:#1b2a40;color:#fff}
+input:focus,textarea:focus,select:focus{outline:3px solid #bfdbfe;border-color:#4b83bd}
+textarea{min-height:115px;resize:vertical}#editor{min-height:360px;font:14px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.row>*{flex:1}
+button,.button{border:0;border-radius:9px;padding:10px 14px;background:var(--blue);color:#fff;font:650 14px system-ui;cursor:pointer;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:hover,.button:hover{filter:brightness(1.08)}button.secondary,.button.secondary{background:#344963;color:#fff}button.dark{background:var(--navy)}button.danger{background:#9f3030}button:disabled{opacity:.5;cursor:not-allowed}
+.small{font-size:13px;color:var(--muted)}.notice{padding:12px 14px;border-radius:10px;background:#263b56;color:#dbe8f7;border:1px solid #405a79;font-size:13px}
+.notice.warn{background:#3a3440;border-color:#716078;color:#ffe3b0}.status{font-size:13px;color:var(--good);min-height:20px;margin-top:8px}
+.pill{display:inline-block;padding:3px 8px;border-radius:20px;background:var(--accent);color:#e5efff;font-size:12px;font-weight:700}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.toolbar button{flex:0 0 auto}
+.stats{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
+.rss-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.rss-list{max-height:470px;overflow:auto;border-top:1px solid var(--line);margin-top:10px}
+.rss-item{display:block;width:100%;text-align:left;background:transparent;color:#ff8a32;border-radius:0;border-bottom:1px solid #40516a;padding:13px 10px;font-weight:500}
+.rss-item:hover,.rss-item.active{background:#293b55;filter:none}
+.rss-date{display:block;color:#a9bad0;font-size:12px;margin-top:7px}
+.meta-value{overflow-wrap:anywhere;color:#f1f5fa}
+.meta-line{margin:5px 0}
+@media(max-width:760px){.grid,.rss-layout{grid-template-columns:1fr}main{margin-top:14px}.card{padding:15px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Extractor de Texto JW.org</h1>
+  <p>Carga publicaciones RSS de JW.org, extrae metadatos y prepara transcripciones para Blogger.</p>
+</header>
+<main>
+  <section class="card">
+    <h2>📡 Lector de publicaciones RSS</h2>
+    <label for="rssUrl">Dirección RSS</label>
+    <input id="rssUrl" type="url" value="https://tvrss.polosatus.ru/es" placeholder="https://...">
+    <div class="toolbar">
+      <button id="loadRss">↻ Cargar RSS</button>
+      <button class="secondary" id="exportJson" disabled>Exportar JSON</button>
+      <button class="secondary" id="importRssFile">Importar RSS/XML</button>
+      <input type="file" id="rssFile" accept=".xml,.rss,.json,.txt" hidden>
+    </div>
+    <div class="small" id="rssStatus" aria-live="polite">Listo para cargar publicaciones.</div>
+    <div class="rss-layout" style="margin-top:14px">
+      <div>
+        <h2>📡 Publicaciones RSS</h2>
+        <label for="rssSearch">Buscar publicaciones</label>
+        <input id="rssSearch" placeholder="Buscar publicaciones...">
+        <div class="rss-list" id="rssList"><p class="small">Carga el RSS para mostrar las publicaciones.</p></div>
+      </div>
+      <div>
+        <h2>🔎 Extractor de metadatos</h2>
+        <div id="rssMetadata" class="small">Selecciona una publicación de la lista para ver sus metadatos.</div>
+        <div class="toolbar">
+          <button id="useRssItem" disabled>Usar publicación en el extractor</button>
+          <button class="secondary" id="openRssVideo" disabled>Abrir video ↗</button>
+          <button class="secondary" id="openRssFile" disabled>Abrir MP4 ↗</button>
+        </div>
+      </div>
+    </div>
+    <div class="notice warn" style="margin-top:12px">
+      Si el navegador bloquea la lectura RSS por CORS, descarga el RSS/XML desde el servicio e impórtalo con «Importar RSS/XML». La aplicación también admite JSON. Los datos se procesan localmente en esta página.
+    </div>
+  </section>
+  <section class="card">
+    <h2>1. Información del video</h2>
+    <label for="videoUrl">Enlace del video JW.org</label>
+    <input id="videoUrl" type="url" placeholder="https://www.jw.org/es/biblioteca/videos/...">
+    <div class="toolbar">
+      <button id="openVideo">Abrir video JW.org ↗</button>
+      <button class="secondary" id="openCaptions">Abrir descargador de subtítulos ↗</button>
+      <button class="secondary" id="copyUrl">Copiar enlace</button>
+    </div>
+    <div class="notice warn">
+      <strong>Cómo funciona:</strong> por las restricciones de seguridad del navegador (CORS), esta página no puede garantizar la lectura directa de los metadatos o subtítulos de JW.org. Abre el video y el descargador en pestañas separadas; luego pega aquí los datos o la transcripción. No se envían tus textos a ningún servidor.
+    </div>
+    <div class="grid" style="margin-top:10px">
+      <div><label for="title">Título</label><input id="title" placeholder="Título del video"></div>
+      <div><label for="date">Fecha de publicación</label><input id="date" placeholder="Ej. 2026"></div>
+    </div>
+    <label for="description">Descripción</label>
+    <textarea id="description" placeholder="Descripción o resumen del video..."></textarea>
+    <div class="row">
+      <div><label for="duration">Duración</label><input id="duration" placeholder="Ej. 5:32"></div>
+      <div><label for="language">Idioma</label><input id="language" value="Español"></div>
+    </div>
+    <div class="status" id="metaStatus" aria-live="polite"></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>2. Importar transcripción</h2>
+      <label for="importText">Pegar subtítulos o texto</label>
+      <textarea id="importText" placeholder="Pega aquí el contenido descargado..."></textarea>
+      <div class="toolbar">
+        <button id="importBtn">Importar al editor</button>
+        <button class="secondary" id="loadFile">Cargar archivo</button>
+        <input type="file" id="fileInput" accept=".txt,.srt,.vtt,.text" hidden>
+      </div>
+      <p class="small">Admite texto copiado y archivos TXT, SRT o VTT. Se quitarán marcas de tiempo y etiquetas de subtítulos al importar.</p>
+    </div>
+    <div class="card">
+      <h2>3. Herramientas de texto</h2>
+      <p class="small">Aplica limpieza y formato al texto que está en el editor.</p>
+      <div class="toolbar">
+        <button class="secondary" id="cleanBtn">Limpiar marcas de tiempo</button>
+        <button class="secondary" id="spacesBtn">Corregir espacios</button>
+        <button class="secondary" id="paragraphBtn">Separar párrafos</button>
+        <button class="secondary" id="upperBtn">MAYÚSCULAS</button>
+      </div>
+      <label for="findText">Buscar y reemplazar</label>
+      <input id="findText" placeholder="Texto que deseas buscar">
+      <input id="replaceText" placeholder="Reemplazar por..." style="margin-top:7px">
+      <div class="toolbar"><button class="secondary" id="replaceBtn">Reemplazar todo</button></div>
+      <div class="notice">La limpieza es automática y puede requerir una revisión manual para conservar la puntuación y los párrafos originales.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>4. Editor de transcripción <span class="pill">Editable</span></h2>
+    <textarea id="editor" spellcheck="true" placeholder="La transcripción aparecerá aquí. También puedes escribir o pegar texto directamente..."></textarea>
+    <div class="stats"><span id="wordCount">0 palabras</span><span id="charCount">0 caracteres</span><span id="lineCount">0 líneas</span></div>
+    <div class="toolbar">
+      <button class="secondary" id="undoBtn">Deshacer</button>
+      <button class="secondary" id="selectAllBtn">Seleccionar todo</button>
+      <button class="secondary" id="copyTextBtn">Copiar texto</button>
+      <button class="danger" id="clearBtn">Vaciar editor</button>
+    </div>
+    <div class="status" id="editorStatus" aria-live="polite"></div>
+  </section>
+
+  <section class="card">
+    <h2>5. Exportar contenido</h2>
+    <label for="exportTitle">Título para el documento</label>
+    <input id="exportTitle" placeholder="Se utilizará el título del video si queda vacío">
+    <div class="toolbar">
+      <button id="downloadTxt">Descargar TXT</button>
+      <button id="downloadHtml">Descargar HTML</button>
+      <button class="secondary" id="copyHtml">Copiar HTML</button>
+    </div>
+    <p class="small">El HTML exportado contiene título, metadatos, descripción y transcripción, listo para revisar y reutilizar en Blogger.</p>
+  </section>
+  <footer>Extractor de Texto JW.org · Aplicación local e independiente · Los datos permanecen en tu dispositivo mientras la página está abierta.</footer>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const captionUrl = 'https://trascrizionejw.blogspot.com/p/scarica-sottotitoli-dai-video-jw.html?m=1';
+  let previousText = '';
+  let rssItems = [];
+  let selectedRss = null;
+
+  function nodeText(parent, selectors) {
+    for (const selector of selectors) {
+      const el = parent.querySelector(selector);
+      if (el && (el.textContent || '').trim()) return el.textContent.trim();
+    }
+    return '';
+  }
+  function parseRssXml(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    if (doc.querySelector('parsererror')) throw new Error('El archivo no parece ser un XML/RSS válido.');
+    return [...doc.querySelectorAll('item, entry')].map((item, index) => {
+      const enclosure = item.querySelector('enclosure');
+      const media = item.querySelector('content[url], media\\:content, content');
+      const linkEl = item.querySelector('link');
+      const link = linkEl ? (linkEl.getAttribute('href') || linkEl.textContent || '').trim() : '';
+      const desc = nodeText(item, ['description','content\\:encoded','content','summary']);
+      const tmp = document.createElement('div'); tmp.innerHTML = desc; 
+      const image = tmp.querySelector('img');
+      return {
+        title: nodeText(item, ['title']) || 'Publicación sin título',
+        date: nodeText(item, ['pubDate','published','updated','dc\\:date']),
+        author: nodeText(item, ['author','dc\\:creator','creator']),
+        guid: nodeText(item, ['guid','id']),
+        link,
+        file: (enclosure && enclosure.getAttribute('url')) || (media && media.getAttribute('url')) || '',
+        type: (enclosure && enclosure.getAttribute('type')) || '',
+        description: desc,
+        imageAlt: image ? (image.getAttribute('alt') || '') : '',
+        duration: nodeText(item, ['itunes\\:duration','duration']),
+        index
+      };
+    });
+  }
+  function parseJsonFeed(data) {
+    const list = Array.isArray(data) ? data : (data.items || data.entries || data.publications || []);
+    return list.map((x, index) => ({
+      title: x.title || x.name || 'Publicación sin título',
+      date: x.pubDate || x.date_published || x.date || x.published || '',
+      author: x.author || x.creator || '',
+      guid: x.guid || x.id || '',
+      link: x.link || x.url || '',
+      file: x.file || x.enclosure?.url || x.video || '',
+      type: x.type || x.enclosure?.type || '',
+      description: x.description || x.content_text || x.content_html || '',
+      imageAlt: x.imageAlt || '',
+      duration: x.duration || '',
+      index
+    }));
+  }
+  function displayDate(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleString('es');
+  }
+  function stripHtml(value) {
+    const d = document.createElement('div'); d.innerHTML = value || '';
+    return (d.textContent || '').trim();
+  }
+  function renderRssList() {
+    const query = $('rssSearch').value.trim().toLocaleLowerCase('es');
+    const filtered = rssItems.filter(x => (x.title+' '+x.author+' '+x.description).toLocaleLowerCase('es').includes(query));
+    $('rssList').innerHTML = '';
+    if (!filtered.length) {
+      $('rssList').innerHTML = '<p class="small">No hay publicaciones que coincidan.</p>';
+      return;
+    }
+    filtered.forEach(item => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rss-item' + (selectedRss === item ? ' active' : '');
+      b.innerHTML = esc(item.title) + '<span class="rss-date">' + esc(displayDate(item.date)) + '</span>';
+      b.addEventListener('click', () => selectRssItem(item));
+      $('rssList').appendChild(b);
+    });
+  }
+  function selectRssItem(item) {
+    selectedRss = item;
+    $('rssMetadata').innerHTML = `
+      <div class="meta-line"><strong>Título:</strong> <span class="meta-value">${esc(item.title)}</span></div>
+      <div class="meta-line"><strong>Fecha:</strong> <span class="meta-value">${esc(displayDate(item.date))}</span></div>
+      <div class="meta-line"><strong>Autor:</strong> <span class="meta-value">${esc(item.author || 'No indicado')}</span></div>
+      <div class="meta-line"><strong>GUID:</strong> <span class="meta-value">${esc(item.guid || 'No indicado')}</span></div>
+      <div class="meta-line"><strong>Enlace:</strong><br><span class="meta-value">${esc(item.link || 'No indicado')}</span></div>
+      <div class="meta-line"><strong>Tipo:</strong> <span class="meta-value">${esc(item.type || 'No indicado')}</span></div>
+      <div class="meta-line"><strong>Archivo:</strong><br><span class="meta-value">${esc(item.file || 'No indicado')}</span></div>
+      <div class="meta-line"><strong>Duración:</strong> <span class="meta-value">${esc(item.duration || 'No indicada')}</span></div>
+      <div class="meta-line"><strong>Descripción:</strong><br><span class="meta-value">${esc(item.imageAlt || stripHtml(item.description) || 'No indicada')}</span></div>`;
+    $('useRssItem').disabled = false;
+    $('openRssVideo').disabled = !item.link;
+    $('openRssFile').disabled = !item.file;
+    renderRssList();
+  }
+  function importRssContent(content, typeHint='') {
+    const trimmed = content.trim();
+    const items = (typeHint === 'json' || trimmed.startsWith('{') || trimmed.startsWith('['))
+      ? parseJsonFeed(JSON.parse(trimmed)) : parseRssXml(content);
+    if (!items.length) throw new Error('No se encontraron publicaciones en el archivo.');
+    rssItems = items; selectedRss = null;
+    $('exportJson').disabled = false;
+    $('rssStatus').textContent = `${items.length} publicaciones cargadas.`;
+    $('rssMetadata').textContent = 'Selecciona una publicación de la lista para ver sus metadatos.';
+    $('useRssItem').disabled = true; $('openRssVideo').disabled = true; $('openRssFile').disabled = true;
+    renderRssList();
+  }
+  async function loadRss() {
+    const url = $('rssUrl').value.trim();
+    if (!url) return alert('Introduce una dirección RSS.');
+    try { const parsed = new URL(url); if (!['http:','https:'].includes(parsed.protocol)) throw new Error(); }
+    catch(e) { return alert('Introduce una dirección RSS válida.'); }
+    $('loadRss').disabled = true; $('rssStatus').textContent = 'Cargando publicaciones RSS…';
+    try {
+      const response = await fetch(url, {cache:'no-store'});
+      if (!response.ok) throw new Error('El servidor respondió con HTTP ' + response.status + '.');
+      const content = await response.text();
+      importRssContent(content, content.trim().startsWith('{') ? 'json' : 'xml');
+    } catch (err) {
+      $('rssStatus').textContent = 'No se pudo leer automáticamente: ' + err.message + ' Importa el archivo RSS/XML descargado.';
+    } finally { $('loadRss').disabled = false; }
+  }
+
+  const editor = $('editor');
+
+  function setStatus(id, message){ $(id).textContent = message; }
+  function safeFileName(s){ return (s || 'transcripcion-jw').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9-_]+/g,'-').replace(/^-|-$/g,'').toLowerCase() || 'transcripcion-jw'; }
+  function cleanCaptions(text){
+    return text
+      .replace(/^\uFEFF/,'')
+      .replace(/^\s*WEBVTT.*$/gmi,'')
+      .replace(/^\s*\d+\s*$/gm,'')
+      .replace(/^\s*(?:\d{1,2}:)?\d{2}:\d{2}[.,]\d{3}\s+-->\s+.*$/gm,'')
+      .replace(/^\s*\d{1,2}:\d{2}[.,]\d{3}\s+-->\s+.*$/gm,'')
+      .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g,'')
+      .replace(/<\/?c(?:\.[^>]*)?>/gi,'')
+      .replace(/<\/?v(?:\s+[^>]*)?>/gi,'')
+      .replace(/<[^>]+>/g,'')
+      .replace(/&nbsp;/g,' ')
+      .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+      .split('\n').map(x=>x.trim()).filter(Boolean).join('\n')
+      .replace(/\n{3,}/g,'\n\n').trim();
+  }
+  function updateStats(){
+    const t=editor.value;
+    const words=t.trim()?t.trim().split(/\s+/).length:0;
+    $('wordCount').textContent=words+' palabras';
+    $('charCount').textContent=t.length+' caracteres';
+    $('lineCount').textContent=(t? t.split(/\r\n|\r|\n/).length:0)+' líneas';
+  }
+  function remember(){ previousText=editor.value; }
+  function download(name, content, type){
+    const blob=new Blob([content],{type});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function makeHtml(){
+    const title=$('exportTitle').value.trim()||$('title').value.trim()||'Transcripción JW.org';
+    const paragraphs=editor.value.trim().split(/\n\s*\n/).filter(Boolean).map(p=>'<p>'+esc(p).replace(/\n/g,'<br>')+'</p>').join('\n');
+    return '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>'+esc(title)+'</title>\n<style>body{max-width:850px;margin:40px auto;padding:0 20px;font:17px/1.7 Arial,sans-serif;color:#202b38}h1{line-height:1.2} .meta{color:#5d6b7a;font-size:14px}p{margin:0 0 1em}</style>\n</head>\n<body>\n<h1>'+esc(title)+'</h1>\n<div class="meta">'+($('date').value.trim()?'Fecha: '+esc($('date').value)+' · ':'')+'Idioma: '+esc($('language').value)+' · Duración: '+esc($('duration').value)+'</div>\n'+($('videoUrl').value.trim()?'<p><a href="'+esc($('videoUrl').value)+'">Ver video original en JW.org</a></p>':'')+
+($('description').value.trim()?'<h2>Descripción</h2><p>'+esc($('description').value).replace(/\n/g,'<br>')+'</p>':'')+
+'<h2>Transcripción</h2>\n'+paragraphs+'\n</body>\n</html>';
+  }
+
+  $('openVideo').addEventListener('click',()=>{const u=$('videoUrl').value.trim();if(!u){alert('Introduce primero el enlace del video.');return;}try{const x=new URL(u);if(!['http:','https:'].includes(x.protocol))throw 0;window.open(x.href,'_blank','noopener');}catch(e){alert('Introduce un enlace válido.');}});
+  $('openCaptions').addEventListener('click',()=>window.open(captionUrl,'_blank','noopener'));
+  $('copyUrl').addEventListener('click',async()=>{const u=$('videoUrl').value.trim();if(!u)return alert('Introduce primero el enlace.');try{await navigator.clipboard.writeText(u);setStatus('metaStatus','Enlace copiado.');}catch(e){setStatus('metaStatus','No se pudo copiar automáticamente.');}});
+  $('importBtn').addEventListener('click',()=>{const t=$('importText').value;if(!t.trim())return alert('Pega primero una transcripción.');remember();editor.value=cleanCaptions(t);updateStats();setStatus('editorStatus','Transcripción importada correctamente.');});
+  $('loadFile').addEventListener('click',()=>$('fileInput').click());
+  $('fileInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{$('importText').value=await f.text();setStatus('metaStatus','Archivo cargado: '+f.name+'. Pulsa “Importar al editor”.');}catch(err){alert('No se pudo leer el archivo.');}e.target.value='';});
+  $('cleanBtn').addEventListener('click',()=>{remember();editor.value=cleanCaptions(editor.value);updateStats();});
+  $('spacesBtn').addEventListener('click',()=>{remember();editor.value=editor.value.replace(/[ \t]+/g,' ').replace(/ *([,.;:!?])/g,'$1').replace(/([,.;:!?])([^\s\n])/g,'$1 $2').replace(/\n{3,}/g,'\n\n').trim();updateStats();});
+  $('paragraphBtn').addEventListener('click',()=>{remember();editor.value=editor.value.replace(/([.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿¡])/g,'$1\n\n');updateStats();});
+  $('upperBtn').addEventListener('click',()=>{remember();editor.value=editor.value.toLocaleUpperCase('es');updateStats();});
+  $('replaceBtn').addEventListener('click',()=>{const f=$('findText').value;if(!f)return alert('Escribe el texto que deseas buscar.');remember();const escaped=f.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');editor.value=editor.value.replace(new RegExp(escaped,'g'),$('replaceText').value);updateStats();});
+  $('undoBtn').addEventListener('click',()=>{if(previousText==='')return;const current=editor.value;editor.value=previousText;previousText=current;updateStats();});
+  $('selectAllBtn').addEventListener('click',()=>{editor.focus();editor.select();});
+  $('copyTextBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(editor.value);setStatus('editorStatus','Texto copiado al portapapeles.');}catch(e){editor.select();setStatus('editorStatus','Selecciona y copia el texto manualmente.');}});
+  $('clearBtn').addEventListener('click',()=>{if(confirm('¿Vaciar todo el texto del editor?')){remember();editor.value='';updateStats();}});
+  $('downloadTxt').addEventListener('click',()=>download(safeFileName($('exportTitle').value||$('title').value)+'.txt',editor.value,'text/plain;charset=utf-8'));
+  $('downloadHtml').addEventListener('click',()=>download(safeFileName($('exportTitle').value||$('title').value)+'.html',makeHtml(),'text/html;charset=utf-8'));
+  $('copyHtml').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(makeHtml());setStatus('editorStatus','HTML copiado.');}catch(e){alert('No se pudo copiar. Descarga el archivo HTML.');}});
+  $('loadRss').addEventListener('click', loadRss);
+  $('rssSearch').addEventListener('input', renderRssList);
+  $('importRssFile').addEventListener('click', ()=>$('rssFile').click());
+  $('rssFile').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try { importRssContent(await file.text(), file.name.toLowerCase().endsWith('.json') ? 'json' : 'xml'); }
+    catch(err) { $('rssStatus').textContent = 'Error al importar: ' + err.message; }
+    e.target.value = '';
+  });
+  $('exportJson').addEventListener('click', () => download('publicaciones-jw-rss.json', JSON.stringify(rssItems, null, 2), 'application/json;charset=utf-8'));
+  $('useRssItem').addEventListener('click', () => {
+    if (!selectedRss) return;
+    $('title').value = selectedRss.title;
+    $('date').value = displayDate(selectedRss.date);
+    $('videoUrl').value = selectedRss.link || '';
+    $('duration').value = selectedRss.duration || '';
+    $('description').value = stripHtml(selectedRss.description);
+    $('exportTitle').value = selectedRss.title;
+    setStatus('metaStatus', 'Metadatos importados desde RSS.');
+    $('videoUrl').scrollIntoView({behavior:'smooth',block:'center'});
+  });
+  $('openRssVideo').addEventListener('click', () => { if (selectedRss?.link) window.open(selectedRss.link, '_blank', 'noopener'); });
+  $('openRssFile').addEventListener('click', () => { if (selectedRss?.file) window.open(selectedRss.file, '_blank', 'noopener'); });
+  editor.addEventListener('input',updateStats);
+  updateStats();
+})();
+</script>
+</body>
+</html>
