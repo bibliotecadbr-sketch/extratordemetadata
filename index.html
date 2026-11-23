@@ -100,11 +100,16 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     <div class="grid" style="margin-top:10px">
       <div><label for="title">Título</label><input id="title" placeholder="Título del video"></div>
       <div><label for="date">Fecha de publicación</label><input id="date" placeholder="Ej. 2026"></div>
+      <div><label for="author">Autor / entidad</label><input id="author" placeholder="Autor del video"></div>
+      <div><label for="duration">Duración</label><input id="duration" placeholder="Ej. 5:32"></div>
     </div>
+    <label for="imageUrl">URL de imagen / miniatura</label>
+    <input id="imageUrl" type="url" placeholder="Se completa desde el RSS cuando está disponible">
+    <label for="mp4Links">Enlaces MP4 disponibles</label>
+    <textarea id="mp4Links" placeholder="Los enlaces de descarga aparecerán aquí, uno por línea."></textarea>
     <label for="description">Descripción</label>
     <textarea id="description" placeholder="Descripción o resumen del video..."></textarea>
     <div class="row">
-      <div><label for="duration">Duración</label><input id="duration" placeholder="Ej. 5:32"></div>
       <div><label for="language">Idioma</label><input id="language" value="Español"></div>
     </div>
     <div class="status" id="metaStatus" aria-live="polite"></div>
@@ -259,70 +264,64 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     }
     return '';
   }
+  function durationFromTitle(title) {
+    const match = String(title || '').match(/\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*$/);
+    return match ? match[1] : '';
+  }
   function parseRssXml(xmlText) {
-    // Permite XML pegado directamente o dentro de un bloque Markdown ```xml.
-    const normalized = xmlText
-      .replace(/^\uFEFF/, '')
-      .replace(/^\s*```(?:xml|rss|html|text)?\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim();
+    const normalized = xmlText.replace(/^\uFEFF/, '').replace(/^\s*```(?:xml|rss|html|text)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
     const doc = new DOMParser().parseFromString(normalized, 'application/xml');
-    if (doc.getElementsByTagName('parsererror').length) {
-      throw new Error('El archivo no parece ser un XML/RSS válido. Comprueba que incluya <rss> y </rss>.');
-    }
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('El archivo no parece ser un XML/RSS válido.');
     const allElements = Array.from(doc.getElementsByTagName('*'));
-    const entries = allElements.filter(el => (el.localName || el.nodeName.split(':').pop()).toLowerCase() === 'item');
-    if (!entries.length) {
-      // Atom feeds use <entry>, including namespace-prefixed entries.
-      entries.push(...allElements.filter(el => (el.localName || el.nodeName.split(':').pop()).toLowerCase() === 'entry'));
-    }
+    const local = el => (el.localName || el.nodeName.split(':').pop()).toLowerCase();
+    const entries = allElements.filter(el => local(el) === 'item');
+    if (!entries.length) entries.push(...allElements.filter(el => local(el) === 'entry'));
     return entries.map((item, index) => {
-      const links = Array.from(item.getElementsByTagName('link'));
-      const linkNode = links.find(el => el.getAttribute('href')) || links[0];
+      const descendants = Array.from(item.getElementsByTagName('*'));
+      const findText = names => {
+        const el = descendants.find(x => names.includes(local(x)) && (x.textContent || '').trim());
+        return el ? el.textContent.trim() : '';
+      };
+      const links = descendants.filter(x => local(x) === 'link');
+      const linkNode = links.find(x => x.getAttribute('href')) || links[0];
       const link = linkNode ? (linkNode.getAttribute('href') || linkNode.textContent || '').trim() : '';
-      const enclosureNodes = Array.from(item.getElementsByTagName('enclosure'));
-      const enclosures = enclosureNodes.map(el => ({
-        url: el.getAttribute('url') || '',
-        type: el.getAttribute('type') || '',
-        length: el.getAttribute('length') || ''
-      })).filter(x => x.url);
-      const desc = firstByLocalName(item, ['description','encoded','summary','content']);
-      const tmp = document.createElement('div');
-      tmp.innerHTML = desc;
-      const image = tmp.querySelector('img');
-      const duration = firstByLocalName(item, ['duration']);
+      const enclosures = descendants.filter(x => ['enclosure','content'].includes(local(x)))
+        .map(x => ({url:x.getAttribute('url') || x.getAttribute('href') || '', type:x.getAttribute('type') || '', length:x.getAttribute('length') || ''}))
+        .filter(x => x.url && (/video|mp4/i.test(x.type) || /\.mp4(?:$|\?)/i.test(x.url)));
+      const title = findText(['title']) || 'Publicación sin título';
+      const desc = findText(['description','encoded','summary','content']);
+      const tmp = document.createElement('div'); tmp.innerHTML = desc;
+      const img = tmp.querySelector('img');
+      const mediaImage = descendants.find(x => ['thumbnail','image'].includes(local(x)) && (x.getAttribute('url') || x.getAttribute('href')));
+      const image = (img && (img.getAttribute('src') || img.getAttribute('data-src'))) || (mediaImage && (mediaImage.getAttribute('url') || mediaImage.getAttribute('href'))) || '';
+      const duration = findText(['duration']) || durationFromTitle(title);
+      const author = findText(['author','creator','name']);
+      const cleanDescription = desc.replace(/<a\b[^>]*>[\s\S]*?<\/a>/gi, ' ').replace(/Download links?:[\s\S]*$/i, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
       return {
-        title: firstByLocalName(item, ['title']) || 'Publicación sin título',
-        date: firstByLocalName(item, ['pubDate','published','updated','date']),
-        author: firstByLocalName(item, ['author','creator']),
-        guid: firstByLocalName(item, ['guid','id']),
-        link,
-        file: enclosures[0]?.url || attrByLocalName(item, 'content', 'url') || '',
-        type: enclosures[0]?.type || '',
-        enclosures,
-        description: desc,
-        image: image ? (image.getAttribute('src') || '') : attrByLocalName(item, 'image', 'href'),
-        imageAlt: image ? (image.getAttribute('alt') || '') : '',
-        duration,
-        index
+        title, date:findText(['pubdate','published','updated','date']), author,
+        guid:findText(['guid','id']), link, file:enclosures[0]?.url || '',
+        type:enclosures[0]?.type || '', enclosures, description:cleanDescription,
+        image, imageAlt:img?.getAttribute('alt') || '', duration, index
       };
     });
   }
   function parseJsonFeed(data) {
     const list = Array.isArray(data) ? data : (data.items || data.entries || data.publications || []);
-    return list.map((x, index) => ({
-      title: x.title || x.name || 'Publicación sin título',
-      date: x.pubDate || x.date_published || x.date || x.published || '',
-      author: x.author || x.creator || '',
-      guid: x.guid || x.id || '',
-      link: x.link || x.url || '',
-      file: x.file || x.enclosure?.link || x.enclosure?.url || x.video || '',
-      type: x.type || x.enclosure?.type || '',
-      description: x.description || x.content_text || x.content_html || '',
-      imageAlt: x.imageAlt || '',
-      duration: x.duration || '',
-      index
-    }));
+    return list.map((x, index) => {
+      const rawEnc = Array.isArray(x.enclosures) ? x.enclosures : (x.enclosure ? [x.enclosure] : []);
+      const enclosures = rawEnc.map(e => ({url:e.url || e.link || '', type:e.type || '', length:e.length || ''})).filter(e => e.url);
+      const title = x.title || x.name || 'Publicación sin título';
+      return {
+        title, date:x.pubDate || x.date_published || x.date || x.published || '',
+        author:typeof x.author === 'string' ? x.author : (x.author?.name || x.creator || ''),
+        guid:x.guid || x.id || '', link:x.link || x.url || '',
+        file:x.file || enclosures[0]?.url || x.enclosure?.link || x.enclosure?.url || x.video || '',
+        type:x.type || enclosures[0]?.type || '', enclosures,
+        description:x.description || x.content_text || x.content_html || '',
+        image:x.thumbnail || x.image || x.image_url || x.enclosure?.thumbnail || '',
+        imageAlt:x.imageAlt || '', duration:x.duration || durationFromTitle(title), index
+      };
+    });
   }
   function displayDate(value) {
     if (!value) return '';
@@ -374,9 +373,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       <div class="meta-line"><strong>Tipo:</strong> <span class="meta-value">${esc(item.type || 'No indicado')}</span></div>
       <div class="meta-line"><strong>Archivo principal:</strong><br><span class="meta-value">${esc(item.file || 'No indicado')}</span></div>
       <div class="meta-line"><strong>Calidades disponibles:</strong><br><span class="meta-value">${(item.enclosures || []).map((x,i) => `<a style="color:#ff9a45" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(['720p','480p','360p','240p'][i] || ('Archivo '+(i+1)))}</a>`).join(' · ') || 'No indicadas'}</span></div>
-      <div class="meta-line"><strong>Imagen:</strong><br><span class="meta-value">${esc(item.image || 'No indicada')}</span></div>
-      <div class="meta-line"><strong>Duración:</strong> <span class="meta-value">${esc(item.duration || 'No indicada')}</span></div>
-      <div class="meta-line"><strong>Descripción:</strong><br><span class="meta-value">${esc(item.imageAlt || stripHtml(item.description) || 'No indicada')}</span></div>`;
+      <div class="meta-line"><strong>Imagen:</strong><br>${item.image ? `<a href="${esc(item.image)}" target="_blank" rel="noopener" style="color:#ff9a45">Abrir imagen</a>` : '<span class="meta-value">No indicada</span>'}</div>
+      <div class="meta-line"><strong>Duración:</strong> <span class="meta-value">${esc(item.duration || durationFromTitle(item.title) || 'No indicada')}</span></div>
+      <div class="meta-line"><strong>Descripción:</strong><br><span class="meta-value">${esc(stripHtml(item.description) || 'No indicada')}</span></div>`;
     $('useRssItem').disabled = false;
     $('openRssVideo').disabled = !item.link;
     $('openRssFile').disabled = !item.file;
@@ -509,7 +508,12 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   }
 
   $('openVideo').addEventListener('click',()=>{const u=$('videoUrl').value.trim();if(!u){alert('Introduce primero el enlace del video.');return;}try{const x=new URL(u);if(!['http:','https:'].includes(x.protocol))throw 0;window.open(x.href,'_blank','noopener');}catch(e){alert('Introduce un enlace válido.');}});
-  $('openCaptions').addEventListener('click',()=>window.open(captionUrl,'_blank','noopener'));
+  $('openCaptions').addEventListener('click',()=>{
+    const win = window.open(captionUrl,'_blank','noopener');
+    setStatus('metaStatus', win
+      ? 'Descargador abierto. Pega allí el enlace JW.org, descarga los subtítulos y vuelve aquí para importar el archivo SRT/VTT/TXT.'
+      : 'El navegador bloqueó la ventana. Permite las ventanas emergentes para abrir el descargador.');
+  });
   $('copyUrl').addEventListener('click',async()=>{const u=$('videoUrl').value.trim();if(!u)return alert('Introduce primero el enlace.');try{await navigator.clipboard.writeText(u);setStatus('metaStatus','Enlace copiado.');}catch(e){setStatus('metaStatus','No se pudo copiar automáticamente.');}});
   $('importBtn').addEventListener('click',()=>{const t=$('importText').value;if(!t.trim())return alert('Pega primero una transcripción.');remember();editor.value=cleanCaptions(t);updateStats();setStatus('editorStatus','Transcripción importada correctamente.');});
   $('loadFile').addEventListener('click',()=>$('fileInput').click());
@@ -547,8 +551,11 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     if (!selectedRss) return;
     $('title').value = selectedRss.title;
     $('date').value = displayDate(selectedRss.date);
+    $('author').value = selectedRss.author || '';
     $('videoUrl').value = selectedRss.link || '';
-    $('duration').value = selectedRss.duration || '';
+    $('duration').value = selectedRss.duration || durationFromTitle(selectedRss.title) || '';
+    $('imageUrl').value = selectedRss.image || '';
+    $('mp4Links').value = (selectedRss.enclosures || []).map(e => e.url).join('\n') || selectedRss.file || '';
     $('description').value = stripHtml(selectedRss.description);
     $('exportTitle').value = selectedRss.title;
     setStatus('metaStatus', 'Metadatos importados desde RSS.');
