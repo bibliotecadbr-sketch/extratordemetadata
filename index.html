@@ -157,8 +157,23 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     <div class="status" id="editorStatus" aria-live="polite"></div>
   </section>
 
-  <section class="card">
-    <h2>5. Exportar contenido</h2>
+  
+<section class="card">
+<h2>5. Tablas de etiquetas automáticas <span class="pill">Editables</span></h2>
+<p class="small">Edita las filas separadas por tabuladores. Tabla 1: código del enlace, tipo y categoría. Tabla 2: abreviatura bíblica y nombre completo. Los cambios se guardan en este navegador.</p>
+<label for="videoMapTable">Tabla 1 · Código | Tipo | Categoría</label>
+<textarea id="videoMapTable" style="min-height:240px;font-family:monospace;font-size:12px" spellcheck="false"></textarea>
+<label for="bibleMapTable">Tabla 2 · Abreviatura | Nombre completo</label>
+<textarea id="bibleMapTable" style="min-height:240px;font-family:monospace;font-size:12px" spellcheck="false"></textarea>
+<div class="toolbar"><button id="saveTagTables">Guardar tablas</button><button class="secondary" id="resetTagTables">Restaurar tablas iniciales</button></div>
+<div class="status" id="tagTableStatus" aria-live="polite"></div>
+<label for="generatedLabels">Etiquetas detectadas</label>
+<input id="generatedLabels" readonly placeholder="Selecciona una publicación RSS">
+<p class="small">Las etiquetas sugeridas son: tipo, categoría, libro bíblico detectado en el título, mes y año de publicación.</p>
+</section>
+
+<section class="card">
+    <h2>6. Exportar contenido</h2>
     <label for="exportTitle">Título para el documento</label>
     <input id="exportTitle" placeholder="Se utilizará el título del video si queda vacío">
     <div class="toolbar">
@@ -176,7 +191,52 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   const captionUrl = 'https://trascrizionejw.blogspot.com/p/scarica-sottotitoli-dai-video-jw.html?m=1';
   let previousText = '';
   let rssItems = [];
+
   let selectedRss = null;
+  const DEFAULT_VIDEO_ROWS = [["StudioMonthlyPrograms", "Programas mensuales", "JW Broadcasting"], ["StudioTalks", "Discursos", "JW Broadcasting"], ["StudioNewsReports", "Noticias y anuncios", "JW Broadcasting"], ["BJF", "Videos educativos", "Niños"], ["BJF", "Canciones", "Niños"], ["BJF", "Animaciones", "Niños"], ["TeenSpiritualGrowth", "Progreso espiritual", "Jóvenes"], ["TeenSpiritualGrowth", "Vida social", "Jóvenes"], ["TeenGoals", "Metas", "Jóvenes"], ["TeenGoals", "Entrevistas y experiencias", "Jóvenes"], ["TeenGoals", "Producciones audiovisuales", "Jóvenes"], ["TeenGoals", "Retos familiares", "Familia"], ["TeenGoals", "El noviazgo y el matrimonio", "Familia"], ["TeenGoals", "Adoración en familia", "Familia"], ["TeenGoals", "Producciones audiovisuales", "Familia"], ["VODPgmEvtMorningWorship", "Adoración matutina", "Programas espirituales"], ["VODPgmEvtMorningWorship", "Programas especiales", "Programas espirituales"], ["VODPgmEvtGilead", "Graduación de Galaad", "Programas espirituales"], ["VODPgmEvtAnnMtg", "Reunión anual", "Programas espirituales"], ["2026Convention", "Asamblea regional 2026 \| Felices para siempre", "Programas espirituales"], ["2026Convention", "Asamblea regional 2025 \| Adoración pura", "Programas espirituales"], ["2026Convention", "Asamblea regional 2024 \| ¡Prediquemos las buenas noticias!", "Programas espirituales"], ["2023Convention", "Asamblea regional 2023 \| \"Tengan paciencia\"", "Programas espirituales"], ["2022Convention", "Asamblea regional 2022 \| “Busquen la paz”", "Programas espirituales"], ["2022Convention", "Asamblea regional 2021 \| \"Poderosos gracias a la fe\"", "Programas espirituales"], ["2022Convention", "Asamblea regional 2020 \| ¡Alégrense siempre!", "Programas espirituales"], ["2022Convention", "Asamblea regional 2019 \| “El amor nunca falla”", "Programas espirituales"], ["2022Convention", "Asamblea regional 2018 \| ¡Sea valiente!", "Programas espirituales"], ["2022Convention", "Asamblea regional 2017 \| ¡No se rinda!", "Programas espirituales"], ["2022Convention", "Asamblea regional 2016 \| Seamos leales a Jehová", "Programas espirituales"], ["2022Convention", "Asamblea regional 2015 \| Imitemos a Cristo", "Programas espirituales"], ["2022Convention", "Asamblea regional 2014 \| Sigamos buscando primero el Reino de Dios", "Programas espirituales"], ["2022Convention", "Traducción", "Qué hacemos"], ["2022Convention", "Producción de programas en audio y video", "Qué hacemos"], ["2022Convention", "Producción y distribución de publicaciones", "Qué hacemos"], ["2022Convention", "Obras de construcción", "Qué hacemos"], ["VODActivitiesReliefWork", "Labores de socorro", "Qué hacemos"], ["VODActivitiesReliefWork", "Escuelas bíblicas y capacitación", "Qué hacemos"], ["VODActivitiesReliefWork", "Eventos especiales", "Qué hacemos"], ["VODActivitiesReliefWork", "Reuniones de entre semana", "Nuestras reuniones y ministerio"], ["VODMinistryTools", "Ayudas para la predicación", "Nuestras reuniones y ministerio"], ["VODMinistryTools", "Enseñanzas importantes de la Biblia", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Mejore sus habilidades en el ministerio", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Maneras de predicar", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Formas de ampliar nuestro ministerio", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Reuniones, asambleas de circuito y asambleas regionales", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Ideas para conversar (2016-2023)", "Nuestras reuniones y ministerio"], ["VODMinistryImproveSkills", "Informes de diferentes partes del mundo", "Nuestra organización"], ["VODMinistryImproveSkills", "Betel", "Nuestra organización"], ["AccomplishMinistry", "Organizados para efectuar nuestra predicación", "Nuestra organización"], ["AccomplishMinistry", "Historia", "Nuestra organización"], ["AccomplishMinistry", "Asuntos legales", "Nuestra organización"], ["VODOrgBloodlessMedicine", "Medicina sin sangre", "Nuestra organización"], ["VODOrgBloodlessMedicine", "Libros de la Biblia", "La Biblia"], ["VODBibleReadingStudy", "La lectura y el estudio de la Biblia", "La Biblia"], ["VODBibleTeachings", "Enseñanzas bíblicas", "La Biblia"], ["VODBibleTeachings", "Relatos bíblicos", "La Biblia"], ["VODBibleTeachings", "Personas, lugares y cosas", "La Biblia"], ["VODBibleTeachings", "Traducciones de la Biblia", "La Biblia"], ["VODBiblePrinciples", "Siga los consejos de la Biblia", "La Biblia"], ["VODBiblePrinciples", "La creación", "La Biblia"], ["DramasGoodNews", "Las buenas noticias según Jesús", "Producciones audiovisuales"], ["VODMoviesBibleTimes", "De tiempos bíblicos", "Producciones audiovisuales"], ["VODMoviesModernDay", "De la actualidad", "Producciones audiovisuales"], ["VODMoviesExtras", "Extras", "Producciones audiovisuales"], ["VODMoviesExtras", "Animaciones", "Producciones audiovisuales"], ["VODMoviesExtras", "Seamos mejores lectores y maestros", "Series"], ["SeriesBJFSongs", "Hazte amigo de Jehová (canciones)", "Series"], ["SeriesBJFLessons", "Hazte amigo de Jehová (videos)", "Series"], ["SeriesBJFLessons", "Descubramos más tesoros", "Series"], ["SeriesBJFLessons", "Disfrute de la vida (videos)", "Series"], ["SeriesBibleTeachings", "Enseñanzas importantes de la Biblia", "Series"], ["SeriesBibleTeachings", "Secretos para un matrimonio feliz", "Series"], ["SeriesBibleTeachings", "Ejemplos de fe", "Series"], ["SeriesBibleTeachings", "Información sobre los libros de la Biblia", "Series"], ["SeriesIronSharpens", "El hierro afila el hierro", "Series"], ["SeriesJehovahsFriends", "Aprende de los amigos de Jehová", "Series"], ["SeriesJehovahsFriends", "Aprendamos de ellos", "Series"], ["SeriesWTLessons", "Lecciones de La Atalaya", "Series"], ["SeriesWTLessons", "Hacer discípulos: una obra de amor", "Series"], ["SeriesWTLessons", "Cuando eres adolescente", "Series"], ["SeriesWTLessons", "Rita y Coral", "Series"], ["SeriesOrgAccomplishments", "Logros de la organización", "Series"], ["SeriesOrgAccomplishments", "Del pasado al presente", "Series"], ["SeriesOrgAccomplishments", "Adoración pura \| Presentación de los capítulos", "Series"], ["SeriesOrgAccomplishments", "Razones para tener fe", "Series"], ["SeriesOrgAccomplishments", "La Biblia les cambió la vida", "Series"], ["SeriesGoodNews", "Las buenas noticias según Jesús", "Series"], ["SeriesGoodNews", "La verdad cambia la vida de las personas", "Series"], ["SeriesGoodNews", "Opiniones sobre el origen de la vida", "Series"], ["SeriesGoodNews", "Ver todo", "Series"], ["SeriesWasItDesigned", "¿Lo diseñó alguien?", "Series"], ["SeriesWebsiteAppHelp", "Ayuda del sitio web y la aplicación", "Series"], ["SeriesWebsiteAppHelp", "Lo que opinan otros jóvenes", "Series"], ["SeriesWebsiteAppHelp", "¿Qué ha sido de ellos?", "Series"], ["SeriesWhiteboard", "La pizarra animada", "Series"], ["SeriesWhiteboard", "La verdad cambia la vida de las personas", "Entrevistas y experiencias"], ["SeriesWhiteboard", "Las recompensas del servicio sagrado", "Entrevistas y experiencias"], ["VODIntExpEndurance", "Se enfrentan a pruebas", "Entrevistas y experiencias"], ["VODIntExpEndurance", "Jóvenes", "Entrevistas y experiencias"], ["VODIntExpEndurance", "Ciencia", "Entrevistas y experiencias"], ["VODIntExpEndurance", "De nuestros archivos", "Entrevistas y experiencias"], ["VODOriginalSongs", "Música", "Canciones originales"], ["VODSJJMeetings", "Música", "Cantemos con gozo a Jehová (para las reuniones)"], ["SeriesLoveMinistry", "Disfruta del ministerio", "Series"]];
+  const DEFAULT_BIBLE_ROWS = [["Gén.", "Génesis"], ["Éxo.", "Éxodo"], ["Lev.", "Levítico"], ["Núm.", "Números"], ["Deut.", "Deuteronomio"], ["Jos.", "Josué"], ["Jue.", "Jueces"], ["Rut.", "Rut"], ["1 Sam.", "1 Samuel"], ["2 Sam.", "2 Samuel"], ["1 Rey.", "1 Reyes"], ["2 Rey.", "2 Reyes"], ["1 Cró.", "1 Crónicas"], ["2 Cró.", "2 Crónicas"], ["Esd.", "Esdras"], ["Neh.", "Nehemías"], ["Est.", "Ester"], ["Job", "Job"], ["Sal.", "Salmos"], ["Prov.", "Proverbios"], ["Ecl.", "Eclesiastés"], ["Cant. de Cant..", "El Cantar de los Cantares"], ["Isa.", "Isaías"], ["Jer.", "Jeremías"], ["Lam.", "Lamentaciones"], ["Eze.", "Ezequiel"], ["Dan.", "Daniel"], ["Ose.", "Oseas"], ["Joe.", "Joel"], ["Amó.", "Amós"], ["Abd.", "Abdías"], ["Jon.", "Jonás"], ["Miq.", "Miqueas"], ["Nah.", "Nahúm"], ["Hab.", "Habacuc"], ["Sof.", "Sofonías"], ["Age.", "Ageo"], ["Zac.", "Zacarías"], ["Mal.", "Malaquías"], ["Mat.", "Mateo"], ["Mar.", "Marcos"], ["Luc.", "Lucas"], ["Juan", "Juan"], ["Hec.", "Hechos"], ["Rom.", "Romanos"], ["1 Cor.", "1 Corintios"], ["2 Cor.", "2 Corintios"], ["Gál.", "Gálatas"], ["Efe.", "Efesios"], ["Filip.", "Filipenses"], ["Col.", "Colosenses"], ["1 Tes.", "1 Tesalonicenses"], ["2 Tes.", "2 Tesalonicenses"], ["1 Tim.", "1 Timoteo"], ["2 Tim.", "2 Timoteo"], ["Tito.", "Tito"], ["File.", "Filemón"], ["Heb.", "Hebreos"], ["Sant.", "Santiago"], ["1 Ped.", "1 Pedro"], ["2 Ped.", "2 Pedro"], ["1 Jua.", "1 Juan"], ["2 Jua.", "2 Juan"], ["3 Jua.", "3 Juan"], ["Jud.", "Judas"], ["Apoc.", "Apocalipsis"]];
+  const rowsToText = rows => rows.map(r => r.join('\t')).join('\n');
+  function readRows(id, count) {
+    return $(id).value.split(/\r?\n/).map(line => line.split('\t').map(x => x.trim()))
+      .filter(r => r.some(Boolean)).map(r => Array.from({length:count}, (_,i) => r[i] || ''));
+  }
+  function loadLabelTables() {
+    let v=DEFAULT_VIDEO_ROWS, b=DEFAULT_BIBLE_ROWS;
+    try { v=JSON.parse(localStorage.getItem('jw_label_video_v1')) || v; b=JSON.parse(localStorage.getItem('jw_label_bible_v1')) || b; } catch(e) {}
+    $('videoMapTable').value=rowsToText(v); $('bibleMapTable').value=rowsToText(b);
+  }
+  function saveLabelTables() {
+    localStorage.setItem('jw_label_video_v1', JSON.stringify(readRows('videoMapTable',3)));
+    localStorage.setItem('jw_label_bible_v1', JSON.stringify(readRows('bibleMapTable',2)));
+    $('tagTableStatus').textContent='Tablas guardadas. Se actualizarán las etiquetas de la publicación seleccionada.';
+    if (selectedRss) updateLabels(selectedRss);
+    loadLabelTables();
+  $('saveTagTables').addEventListener('click', saveLabelTables);
+  $('resetTagTables').addEventListener('click', () => {
+    if(confirm('¿Restaurar las tablas iniciales?')) {
+      localStorage.removeItem('jw_label_video_v1'); localStorage.removeItem('jw_label_bible_v1');
+      loadLabelTables(); populateVideoFilters(); renderRssList();
+      if(selectedRss) updateLabels(selectedRss);
+      $('tagTableStatus').textContent='Tablas iniciales restauradas.';
+    }
+  });
+  populateVideoFilters(); renderRssList();
+  }
+  function tagValues(item) {
+    const code=getVideoTypeKey(item), title=item.title || '';
+    const videoRows=readRows('videoMapTable',3).filter(r=>r[0]===code);
+    const chosen=videoRows.find(r=>r[1] && title.toLocaleLowerCase('es').includes(r[1].toLocaleLowerCase('es'))) || videoRows[0];
+    const type=chosen ? chosen[1] : '';
+    const category=videoRows.find(r=>r[2])?.[2] || '';
+    const bibleRows=readRows('bibleMapTable',2);
+    const bookRow=bibleRows.find(r => r[0] && new RegExp('(^|[^\\p{L}])'+r[0].replace(/[.*+?^${}()|[\\]\\\\]/g,'\\$&')+'(?=\\s|\\d|[),.;:]|$)','iu').test(title));
+    const book=bookRow ? bookRow[1] : '';
+    const d=new Date(item.date || '');
+    const month=Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('es',{month:'long'});
+    const year=Number.isNaN(d.getTime()) ? '' : String(d.getFullYear());
+    return [...new Set([type,category,book,month,year].filter(Boolean))];
+  }
+  function updateLabels(item) { $('generatedLabels').value=tagValues(item).join(', '); }
 
   // Catálogo de tipos y categorías tomado de la tabla proporcionada.
   // La clave corresponde al segmento de tipo en el enlace tv.jw.org/#es/mediaitems/TIPO/...
@@ -226,20 +286,19 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     return match ? decodeURIComponent(match[1]) : '';
   }
   function getVideoCatalog(item) {
-    const key = getVideoTypeKey(item);
-    const found = VIDEO_CATALOG[key];
-    return {key, category:found?.category || 'Sin clasificar', type:found?.type || 'Tipo no incluido en la tabla'};
+    const key=getVideoTypeKey(item), rows=readRows('videoMapTable',3).filter(r=>r[0]===key);
+    return {key, category:rows.find(r=>r[2])?.[2] || 'Sin clasificar', type:[...new Set(rows.map(r=>r[1]).filter(Boolean))].join('; ') || 'Tipo no incluido en la tabla'};
   }
   function populateVideoFilters() {
-    const categories = [...new Set(Object.values(VIDEO_CATALOG).map(x=>x.category))].sort((a,b)=>a.localeCompare(b,'es'));
+    const categories = [...new Set(readRows('videoMapTable',3).map(r=>r[2]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
     $('rssCategory').innerHTML = '<option value="">Todas las categorías</option>' + categories.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
     updateVideoTypeFilter();
   }
   function updateVideoTypeFilter() {
     const category = $('rssCategory').value;
-    const types = [...new Set(Object.values(VIDEO_CATALOG)
-      .filter(x=>!category || x.category===category)
-      .flatMap(x=>x.type.split(';').map(t=>t.trim()).filter(Boolean)))].sort((a,b)=>a.localeCompare(b,'es'));
+    const types = [...new Set(readRows('videoMapTable',3)
+      .filter(r=>!category || r[2]===category)
+      .map(r=>r[1]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
     $('rssVideoType').innerHTML = '<option value="">Todos los tipos</option>' + types.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
   }
 
@@ -361,6 +420,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   }
   function selectRssItem(item) {
     selectedRss = item;
+    updateLabels(item);
     $('rssMetadata').innerHTML = `
       <div class="meta-line"><strong>Título:</strong> <span class="meta-value">${esc(item.title)}</span></div>
       <div class="meta-line"><strong>Fecha:</strong> <span class="meta-value">${esc(displayDate(item.date))}</span></div>
@@ -501,10 +561,11 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function makeHtml(){
     const title=$('exportTitle').value.trim()||$('title').value.trim()||'Transcripción JW.org';
+    const labels=selectedRss ? tagValues(selectedRss) : $('generatedLabels').value.split(',').map(x=>x.trim()).filter(Boolean);
     const paragraphs=editor.value.trim().split(/\n\s*\n/).filter(Boolean).map(p=>'<p>'+esc(p).replace(/\n/g,'<br>')+'</p>').join('\n');
-    return '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>'+esc(title)+'</title>\n<style>body{max-width:850px;margin:40px auto;padding:0 20px;font:17px/1.7 Arial,sans-serif;color:#202b38}h1{line-height:1.2} .meta{color:#5d6b7a;font-size:14px}p{margin:0 0 1em}</style>\n</head>\n<body>\n<h1>'+esc(title)+'</h1>\n<div class="meta">'+($('date').value.trim()?'Fecha: '+esc($('date').value)+' · ':'')+'Idioma: '+esc($('language').value)+' · Duración: '+esc($('duration').value)+'</div>\n'+($('videoUrl').value.trim()?'<p><a href="'+esc($('videoUrl').value)+'">Ver video original en JW.org</a></p>':'')+
+    return '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="keywords" content="'+esc(labels.join(', '))+'">\n<title>'+esc(title)+'</title>\n<style>body{max-width:850px;margin:40px auto;padding:0 20px;font:17px/1.7 Arial,sans-serif;color:#202b38}h1{line-height:1.2} .meta{color:#5d6b7a;font-size:14px}p{margin:0 0 1em}</style>\n</head>\n<body>\n<h1>'+esc(title)+'</h1>\n<div class="meta">'+($('date').value.trim()?'Fecha: '+esc($('date').value)+' · ':'')+'Idioma: '+esc($('language').value)+' · Duración: '+esc($('duration').value)+'</div>\n'+($('videoUrl').value.trim()?'<p><a href="'+esc($('videoUrl').value)+'">Ver video original en JW.org</a></p>':'')+
 ($('description').value.trim()?'<h2>Descripción</h2><p>'+esc($('description').value).replace(/\n/g,'<br>')+'</p>':'')+
-'<h2>Transcripción</h2>\n'+paragraphs+'\n</body>\n</html>';
+(labels.length?'<p class="meta"><strong>Etiquetas sugeridas para Blogger:</strong> '+esc(labels.join(', '))+'</p>\n':'')+'<h2>Transcripción</h2>\n'+paragraphs+'\n</body>\n</html>';
   }
 
   $('openVideo').addEventListener('click',()=>{const u=$('videoUrl').value.trim();if(!u){alert('Introduce primero el enlace del video.');return;}try{const x=new URL(u);if(!['http:','https:'].includes(x.protocol))throw 0;window.open(x.href,'_blank','noopener');}catch(e){alert('Introduce un enlace válido.');}});
