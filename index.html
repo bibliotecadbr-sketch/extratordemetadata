@@ -610,10 +610,18 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   function makeHtml(){
     const title=$('exportTitle').value.trim()||$('title').value.trim()||'Transcripción JW.org';
     const labels=selectedRss ? tagValues(selectedRss) : $('generatedLabels').value.split(',').map(x=>x.trim()).filter(Boolean);
-    const paragraphs=editor.value.trim().split(/\n\s*\n/).filter(Boolean).map(p=>'<p>'+esc(p).replace(/\n/g,'<br>')+'</p>').join('\n');
-    return '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="keywords" content="'+esc(labels.join(', '))+'">\n<title>'+esc(title)+'</title>\n<style>body{max-width:850px;margin:40px auto;padding:0 20px;font:17px/1.7 Arial,sans-serif;color:#202b38}h1{line-height:1.2} .meta{color:#5d6b7a;font-size:14px}p{margin:0 0 1em}</style>\n</head>\n<body>\n<h1>'+esc(title)+'</h1>\n<div class="meta">'+($('date').value.trim()?'Fecha: '+esc($('date').value)+' · ':'')+'Idioma: '+esc($('language').value)+' · Duración: '+esc($('duration').value)+'</div>\n'+($('videoUrl').value.trim()?'<p><a href="'+esc($('videoUrl').value)+'">Ver video original en JW.org</a></p>':'')+
-($('description').value.trim()?'<h2>Descripción</h2><p>'+esc($('description').value).replace(/\n/g,'<br>')+'</p>':'')+
-(labels.length?'<p class="meta"><strong>Etiquetas sugeridas para Blogger:</strong> '+esc(labels.join(', '))+'</p>\n':'')+'<h2>Transcripción</h2>\n'+paragraphs+'\n</body>\n</html>';
+    const paragraphs=editor.value.trim().split(/\n\s*\n/).filter(Boolean)
+      .map(p=>'<p style="text-align: justify;"><span style="font-family: arial;">'+esc(p).replace(/\n/g,'<br />')+'</span></p>').join('\n');
+    const video=$('videoUrl').value.trim();
+    const image=$('imageUrl').value.trim();
+    const videoBlock=video
+      ? '<div style="text-align: left;"><span style="font-family: arial;"><b><a href="'+esc(video)+'" target="_blank" rel="noopener">'+esc(title)+'</a></b></span></div>\n'
+      : '';
+    const imageBlock=image
+      ? '<div class="separator" style="clear: both; text-align: center;"><a href="'+esc(image)+'" imageanchor="1"><img src="'+esc(image)+'" alt="'+esc(title)+'" style="max-width:100%; height:auto;" /></a></div>\n'
+      : '';
+    return '<!-- Publicación preparada para Blogger. Etiquetas sugeridas: '+esc(labels.join(', '))+' -->\n'
+      + paragraphs + '\n' + videoBlock + imageBlock;
   }
 
   $('openVideo').addEventListener('click',()=>{const u=$('videoUrl').value.trim();if(!u){alert('Introduce primero el enlace del video.');return;}try{const x=new URL(u);if(!['http:','https:'].includes(x.protocol))throw 0;window.open(x.href,'_blank','noopener');}catch(e){alert('Introduce un enlace válido.');}});
