@@ -70,7 +70,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       </div>
     </div>
     <div class="notice warn" style="margin-top:12px">
-      Si el navegador bloquea la lectura RSS por CORS, descarga el RSS/XML desde el servicio e impórtalo con «Importar RSS/XML». La aplicación también admite JSON. Los datos se procesan localmente en esta página.
+      La aplicación intenta primero la conexión directa y, si el servidor bloquea CORS, prueba un servicio alternativo para leer este RSS público. Si ambos métodos fallan, descarga el RSS/XML e impórtalo con «Importar RSS/XML». También admite JSON.
     </div>
   </section>
   <section class="card">
@@ -265,19 +265,35 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     $('useRssItem').disabled = true; $('openRssVideo').disabled = true; $('openRssFile').disabled = true;
     renderRssList();
   }
+  async function fetchRssText(url) {
+    // 1) Intento directo: funciona si el servidor RSS permite CORS.
+    try {
+      const response = await fetch(url, {cache:'no-store'});
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      return {text: await response.text(), method: 'conexión directa'};
+    } catch (directError) {
+      // 2) Alternativa para feeds públicos que no habilitan CORS.
+      // El proxy solo recibe la URL pública del RSS; no se envían datos del editor.
+      const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+      const response = await fetch(proxyUrl, {cache:'no-store'});
+      if (!response.ok) throw new Error('La conexión directa fue bloqueada (CORS) y el servicio alternativo respondió HTTP ' + response.status + '.');
+      const text = await response.text();
+      if (!text || !text.trim()) throw new Error('El servicio alternativo devolvió una respuesta vacía.');
+      return {text, method: 'conexión alternativa'};
+    }
+  }
   async function loadRss() {
     const url = $('rssUrl').value.trim();
     if (!url) return alert('Introduce una dirección RSS.');
     try { const parsed = new URL(url); if (!['http:','https:'].includes(parsed.protocol)) throw new Error(); }
     catch(e) { return alert('Introduce una dirección RSS válida.'); }
-    $('loadRss').disabled = true; $('rssStatus').textContent = 'Cargando publicaciones RSS…';
+    $('loadRss').disabled = true; $('rssStatus').textContent = 'Conectando con el servidor RSS…';
     try {
-      const response = await fetch(url, {cache:'no-store'});
-      if (!response.ok) throw new Error('El servidor respondió con HTTP ' + response.status + '.');
-      const content = await response.text();
-      importRssContent(content, content.trim().startsWith('{') ? 'json' : 'xml');
+      const result = await fetchRssText(url);
+      importRssContent(result.text, result.text.trim().startsWith('{') ? 'json' : 'xml');
+      $('rssStatus').textContent += ' · Cargado mediante ' + result.method + '.';
     } catch (err) {
-      $('rssStatus').textContent = 'No se pudo leer automáticamente: ' + err.message + ' Importa el archivo RSS/XML descargado.';
+      $('rssStatus').textContent = 'No fue posible cargar el RSS. ' + err.message + ' Usa «Importar RSS/XML» para cargar un archivo descargado.';
     } finally { $('loadRss').disabled = false; }
   }
 
