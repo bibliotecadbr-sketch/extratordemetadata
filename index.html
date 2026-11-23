@@ -251,18 +251,38 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     populateVideoFilters();renderRssList();
   }
   function tagValues(item) {
-    const code=getVideoTypeKey(item), title=item.title || '';
+    const code=getVideoTypeKey(item);
+    const title=item.title || '';
     const videoRows=readRows('videoMapTable',3).filter(r=>r[0]===code);
     const chosen=videoRows.find(r=>r[1] && title.toLocaleLowerCase('es').includes(r[1].toLocaleLowerCase('es'))) || videoRows[0];
     const type=chosen ? chosen[1] : '';
     const category=videoRows.find(r=>r[2])?.[2] || '';
+
+    // Detect a presenter/speaker from the text before the first colon.
+    let person='';
+    const beforeColon=title.split(':')[0].trim();
+    if (title.includes(':') && beforeColon && beforeColon.length<=70 &&
+        !/^(jw broadcasting|jw library|informe|asamblea regional)$/i.test(beforeColon)) {
+      person=beforeColon;
+    }
+
+    // Match abbreviations in parentheses and convert them to full Bible book names.
     const bibleRows=readRows('bibleMapTable',2);
-    const bookRow=bibleRows.find(r => r[0] && new RegExp('(^|[^\\p{L}])'+r[0].replace(/[.*+?^${}()|[\\]\\\\]/g,'\\$&')+'(?=\\s|\\d|[),.;:]|$)','iu').test(title));
-    const book=bookRow ? bookRow[1] : '';
+    let book='';
+    const refs=[...title.matchAll(/\(([^)]*)\)/g)].map(m=>m[1]);
+    for (const ref of refs) {
+      const found=bibleRows.find(r=>r[0] && new RegExp('(^|[^\\p{L}])'+r[0].replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?=\\s|\\d|[),.;:]|$)','iu').test(ref));
+      if(found) { book=found[1]; break; }
+    }
+    if(!book) {
+      const found=bibleRows.find(r=>r[0] && new RegExp('(^|[^\\p{L}])'+r[0].replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?=\\s|\\d|[),.;:]|$)','iu').test(title));
+      if(found) book=found[1];
+    }
+
     const d=new Date(item.date || '');
-    const month=Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('es',{month:'long'});
-    const year=Number.isNaN(d.getTime()) ? '' : String(d.getFullYear());
-    return [...new Set([type,category,book,month,year].filter(Boolean))];
+    const month=Number.isNaN(d.getTime())?'':d.toLocaleDateString('es',{month:'long'});
+    const year=Number.isNaN(d.getTime())?'':String(d.getFullYear());
+    return [...new Set([month,year,type,category,person,book].filter(Boolean))];
   }
   function updateLabels(item) { $('generatedLabels').value=tagValues(item).join(', '); }
 
