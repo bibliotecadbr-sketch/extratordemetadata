@@ -49,6 +49,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       <button id="loadRss">↻ Cargar RSS</button>
       <button class="secondary" id="exportJson" disabled>Exportar JSON</button>
       <button class="secondary" id="importRssFile">Importar RSS/XML</button>
+      <button class="secondary" id="openFeed">Abrir RSS ↗</button>
       <input type="file" id="rssFile" accept=".xml,.rss,.json,.txt" hidden>
     </div>
     <div class="small" id="rssStatus" aria-live="polite">Listo para cargar publicaciones.</div>
@@ -70,7 +71,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       </div>
     </div>
     <div class="notice warn" style="margin-top:12px">
-      La aplicación intenta primero la conexión directa y, si el servidor bloquea CORS, prueba un servicio alternativo para leer este RSS público. Si ambos métodos fallan, descarga el RSS/XML e impórtalo con «Importar RSS/XML». También admite JSON.
+      La aplicación prueba conexión directa, dos proxies CORS y un conversor RSS a JSON. Si tu red bloquea esos servicios, pulsa «Abrir RSS», guarda el contenido como archivo XML y luego usa «Importar RSS/XML». También admite JSON.
     </div>
   </section>
   <section class="card">
@@ -202,7 +203,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       author: x.author || x.creator || '',
       guid: x.guid || x.id || '',
       link: x.link || x.url || '',
-      file: x.file || x.enclosure?.url || x.video || '',
+      file: x.file || x.enclosure?.link || x.enclosure?.url || x.video || '',
       type: x.type || x.enclosure?.type || '',
       description: x.description || x.content_text || x.content_html || '',
       imageAlt: x.imageAlt || '',
@@ -266,21 +267,47 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     renderRssList();
   }
   async function fetchRssText(url) {
-    // 1) Intento directo: funciona si el servidor RSS permite CORS.
-    try {
-      const response = await fetch(url, {cache:'no-store'});
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      return {text: await response.text(), method: 'conexión directa'};
-    } catch (directError) {
-      // 2) Alternativa para feeds públicos que no habilitan CORS.
-      // El proxy solo recibe la URL pública del RSS; no se envían datos del editor.
-      const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-      const response = await fetch(proxyUrl, {cache:'no-store'});
-      if (!response.ok) throw new Error('La conexión directa fue bloqueada (CORS) y el servicio alternativo respondió HTTP ' + response.status + '.');
-      const text = await response.text();
-      if (!text || !text.trim()) throw new Error('El servicio alternativo devolvió una respuesta vacía.');
-      return {text, method: 'conexión alternativa'};
+    const failures = [];
+    // Algunos servidores RSS no permiten CORS. Probamos varias rutas públicas,
+    // sin enviar a esos servicios ningún texto del editor ni datos personales.
+    const attempts = [
+      {
+        name: 'conexión directa',
+        url: url,
+        parse: async r => await r.text()
+      },
+      {
+        name: 'proxy AllOrigins',
+        url: 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+        parse: async r => await r.text()
+      },
+      {
+        name: 'proxy CORS',
+        url: 'https://corsproxy.io/?url=' + encodeURIComponent(url),
+        parse: async r => await r.text()
+      },
+      {
+        name: 'conversor RSS2JSON',
+        url: 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(url),
+        parse: async r => {
+          const data = await r.json();
+          if (data.status && data.status !== 'ok') throw new Error(data.message || 'RSS2JSON no pudo convertir el feed.');
+          return JSON.stringify(data.items || data);
+        }
+      }
+    ];
+    for (const attempt of attempts) {
+      try {
+        const response = await fetch(attempt.url, {cache:'no-store'});
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const text = await attempt.parse(response);
+        if (!text || !text.trim()) throw new Error('respuesta vacía');
+        return {text, method: attempt.name};
+      } catch (err) {
+        failures.push(attempt.name + ': ' + (err.message || 'fallo de conexión'));
+      }
     }
+    throw new Error('Fallaron todos los métodos de conexión. ' + failures.join(' | '));
   }
   async function loadRss() {
     const url = $('rssUrl').value.trim();
@@ -293,7 +320,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       importRssContent(result.text, result.text.trim().startsWith('{') ? 'json' : 'xml');
       $('rssStatus').textContent += ' · Cargado mediante ' + result.method + '.';
     } catch (err) {
-      $('rssStatus').textContent = 'No fue posible cargar el RSS. ' + err.message + ' Usa «Importar RSS/XML» para cargar un archivo descargado.';
+      $('rssStatus').textContent = 'No fue posible cargar el RSS. ' + err.message + ' Como alternativa, pulsa «Abrir RSS», guarda el archivo XML y luego impórtalo.';
     } finally { $('loadRss').disabled = false; }
   }
 
@@ -361,6 +388,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   $('loadRss').addEventListener('click', loadRss);
   $('rssSearch').addEventListener('input', renderRssList);
   $('importRssFile').addEventListener('click', ()=>$('rssFile').click());
+  $('openFeed').addEventListener('click', () => { const u=$('rssUrl').value.trim(); if(u) window.open(u, '_blank', 'noopener'); });
   $('rssFile').addEventListener('change', async e => {
     const file = e.target.files[0]; if (!file) return;
     try { importRssContent(await file.text(), file.name.toLowerCase().endsWith('.json') ? 'json' : 'xml'); }
