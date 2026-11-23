@@ -48,9 +48,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     <div class="toolbar">
       <button id="loadRss">↻ Cargar RSS</button>
       <button class="secondary" id="exportJson" disabled>Exportar JSON</button>
-      <button class="secondary" id="importRssFile">Importar RSS/XML</button>
+      <button class="secondary" id="importRssFile">Importar RSS/XML/MD</button>
       <button class="secondary" id="openFeed">Abrir RSS ↗</button>
-      <input type="file" id="rssFile" accept=".xml,.rss,.json,.txt" hidden>
+      <input type="file" id="rssFile" accept=".xml,.rss,.json,.txt,.md" hidden>
     </div>
     <div class="small" id="rssStatus" aria-live="polite">Listo para cargar publicaciones.</div>
     <div class="rss-layout" style="margin-top:14px">
@@ -71,7 +71,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       </div>
     </div>
     <div class="notice warn" style="margin-top:12px">
-      La aplicación prueba conexión directa, dos proxies CORS y un conversor RSS a JSON. Si tu red bloquea esos servicios, pulsa «Abrir RSS», guarda el contenido como archivo XML y luego usa «Importar RSS/XML». También admite JSON.
+      La aplicación prueba conexión directa, dos proxies CORS y un conversor RSS a JSON. Si tu red bloquea esos servicios, pulsa «Abrir RSS», guarda el contenido como archivo XML y luego usa «Importar RSS/XML/MD». También admite JSON.
     </div>
   </section>
   <section class="card">
@@ -162,35 +162,71 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   let rssItems = [];
   let selectedRss = null;
 
-  function nodeText(parent, selectors) {
-    for (const selector of selectors) {
-      const el = parent.querySelector(selector);
-      if (el && (el.textContent || '').trim()) return el.textContent.trim();
+  function firstByLocalName(parent, names) {
+    const wanted = names.map(x => x.toLowerCase());
+    for (const el of Array.from(parent.getElementsByTagName('*'))) {
+      const local = (el.localName || el.nodeName.split(':').pop()).toLowerCase();
+      if (wanted.includes(local)) {
+        const value = (el.textContent || '').trim();
+        if (value) return value;
+      }
+    }
+    return '';
+  }
+  function attrByLocalName(parent, localName, attr) {
+    for (const el of Array.from(parent.getElementsByTagName('*'))) {
+      const local = (el.localName || el.nodeName.split(':').pop()).toLowerCase();
+      if (local === localName.toLowerCase()) {
+        const value = el.getAttribute(attr);
+        if (value) return value;
+      }
     }
     return '';
   }
   function parseRssXml(xmlText) {
-    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
-    if (doc.querySelector('parsererror')) throw new Error('El archivo no parece ser un XML/RSS válido.');
-    return [...doc.querySelectorAll('item, entry')].map((item, index) => {
-      const enclosure = item.querySelector('enclosure');
-      const media = item.querySelector('content[url], media\\:content, content');
-      const linkEl = item.querySelector('link');
-      const link = linkEl ? (linkEl.getAttribute('href') || linkEl.textContent || '').trim() : '';
-      const desc = nodeText(item, ['description','content\\:encoded','content','summary']);
-      const tmp = document.createElement('div'); tmp.innerHTML = desc; 
+    // Permite XML pegado directamente o dentro de un bloque Markdown ```xml.
+    const normalized = xmlText
+      .replace(/^\uFEFF/, '')
+      .replace(/^\s*```(?:xml|rss|html|text)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+    const doc = new DOMParser().parseFromString(normalized, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) {
+      throw new Error('El archivo no parece ser un XML/RSS válido. Comprueba que incluya <rss> y </rss>.');
+    }
+    const entries = Array.from(doc.getElementsByTagName('item'));
+    if (!entries.length) {
+      // Atom feeds use <entry>.
+      entries.push(...Array.from(doc.getElementsByTagName('entry')));
+    }
+    return entries.map((item, index) => {
+      const links = Array.from(item.getElementsByTagName('link'));
+      const linkNode = links.find(el => el.getAttribute('href')) || links[0];
+      const link = linkNode ? (linkNode.getAttribute('href') || linkNode.textContent || '').trim() : '';
+      const enclosureNodes = Array.from(item.getElementsByTagName('enclosure'));
+      const enclosures = enclosureNodes.map(el => ({
+        url: el.getAttribute('url') || '',
+        type: el.getAttribute('type') || '',
+        length: el.getAttribute('length') || ''
+      })).filter(x => x.url);
+      const desc = firstByLocalName(item, ['description','encoded','summary','content']);
+      const tmp = document.createElement('div');
+      tmp.innerHTML = desc;
       const image = tmp.querySelector('img');
+      const duration = firstByLocalName(item, ['duration']);
       return {
-        title: nodeText(item, ['title']) || 'Publicación sin título',
-        date: nodeText(item, ['pubDate','published','updated','dc\\:date']),
-        author: nodeText(item, ['author','dc\\:creator','creator']),
-        guid: nodeText(item, ['guid','id']),
+        title: firstByLocalName(item, ['title']) || 'Publicación sin título',
+        date: firstByLocalName(item, ['pubDate','published','updated','date']),
+        author: firstByLocalName(item, ['author','creator']),
+        guid: firstByLocalName(item, ['guid','id']),
         link,
-        file: (enclosure && enclosure.getAttribute('url')) || (media && media.getAttribute('url')) || '',
-        type: (enclosure && enclosure.getAttribute('type')) || '',
+        file: enclosures[0]?.url || attrByLocalName(item, 'content', 'url') || '',
+        type: enclosures[0]?.type || '',
+        enclosures,
         description: desc,
+        image: image ? (image.getAttribute('src') || '') : attrByLocalName(item, 'image', 'href'),
         imageAlt: image ? (image.getAttribute('alt') || '') : '',
-        duration: nodeText(item, ['itunes\\:duration','duration']),
+        duration,
         index
       };
     });
@@ -246,7 +282,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       <div class="meta-line"><strong>GUID:</strong> <span class="meta-value">${esc(item.guid || 'No indicado')}</span></div>
       <div class="meta-line"><strong>Enlace:</strong><br><span class="meta-value">${esc(item.link || 'No indicado')}</span></div>
       <div class="meta-line"><strong>Tipo:</strong> <span class="meta-value">${esc(item.type || 'No indicado')}</span></div>
-      <div class="meta-line"><strong>Archivo:</strong><br><span class="meta-value">${esc(item.file || 'No indicado')}</span></div>
+      <div class="meta-line"><strong>Archivo principal:</strong><br><span class="meta-value">${esc(item.file || 'No indicado')}</span></div>
+      <div class="meta-line"><strong>Calidades disponibles:</strong><br><span class="meta-value">${(item.enclosures || []).map((x,i) => `<a style="color:#ff9a45" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(['720p','480p','360p','240p'][i] || ('Archivo '+(i+1)))}</a>`).join(' · ') || 'No indicadas'}</span></div>
+      <div class="meta-line"><strong>Imagen:</strong><br><span class="meta-value">${esc(item.image || 'No indicada')}</span></div>
       <div class="meta-line"><strong>Duración:</strong> <span class="meta-value">${esc(item.duration || 'No indicada')}</span></div>
       <div class="meta-line"><strong>Descripción:</strong><br><span class="meta-value">${esc(item.imageAlt || stripHtml(item.description) || 'No indicada')}</span></div>`;
     $('useRssItem').disabled = false;
