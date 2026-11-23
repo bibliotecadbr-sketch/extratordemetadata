@@ -112,8 +112,6 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       <div><label for="author">Autor / entidad</label><input id="author" placeholder="Autor del video"></div>
       <div><label for="duration">Duración</label><input id="duration" placeholder="Ej. 5:32"></div>
     </div>
-    <label for="imageUrl">URL de imagen / miniatura</label>
-    <input id="imageUrl" type="url" placeholder="Se completa desde el RSS cuando está disponible">
     <label for="mp4Links">Enlaces MP4 disponibles</label>
     <textarea id="mp4Links" placeholder="Los enlaces de descarga aparecerán aquí, uno por línea."></textarea>
     <label for="description">Descripción</label>
@@ -192,9 +190,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       <button id="downloadHtml">Descargar HTML</button>
       <button class="secondary" id="copyHtml">Copiar HTML</button>
     </div>
-    <p class="small">El HTML exportado contiene título, metadatos, descripción y transcripción, listo para revisar y reutilizar en Blogger.</p>
+    <p class="small">El HTML para Blogger contiene la transcripción en párrafos justificados, el título del video enlazado a JW.org y la imagen fija elegida por el usuario al final. No incluye imágenes ni miniaturas de JW.org. Las etiquetas se copian por separado.</p>
   </section>
-  <footer>Extractor de Texto JW.org · Aplicación local e independiente · Los datos permanecen en tu dispositivo mientras la página está abierta.</footer>
+  <footer>Generador de publicaciones JW.org para Blogger · Aplicación local e independiente · Imagen personalizada del usuario.</footer>
 </main>
 <script>
 (() => {
@@ -613,13 +611,11 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     const paragraphs=editor.value.trim().split(/\n\s*\n/).filter(Boolean)
       .map(p=>'<p style="text-align: justify;"><span style="font-family: arial;">'+esc(p).replace(/\n/g,'<br />')+'</span></p>').join('\n');
     const video=$('videoUrl').value.trim();
-    const image=$('imageUrl').value.trim();
     const videoBlock=video
       ? '<div style="text-align: left;"><span style="font-family: arial;"><b><a href="'+esc(video)+'" target="_blank" rel="noopener">'+esc(title)+'</a></b></span></div>\n'
       : '';
-    const imageBlock=image
-      ? '<div class="separator" style="clear: both; text-align: center;"><a href="'+esc(image)+'" imageanchor="1"><img src="'+esc(image)+'" alt="'+esc(title)+'" style="max-width:100%; height:auto;" /></a></div>\n'
-      : '';
+    const publicationImage='https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgjIIfs8OGIAq8v_aZx9zdfUO_sAK9uHTmJ0dealgP71dZdpKMnkqNqDYsMToKqpdt5aLVn-1f4VeHolri2M6_1VZZFVcSBxlvNY-iCETuYbkJYCZD1u6nb5bKJ6PTIqDt8oLUbhxQOnf_7yPHaTrpjhscT_9UHxjL4XOZohvwQaG64D4CCUqeu_vLtB-I/s1408/Gemini_Generated_Image_1lo27h1lo27h1lo2.jpg';
+    const imageBlock='<div class="separator" style="clear: both; text-align: center;"><a href="'+publicationImage+'" style="margin-left: 1em; margin-right: 1em;"><img border="0" src="'+publicationImage+'" alt="Imagen de la publicación" style="max-width: 100%; height: auto;" /></a></div>\n';
     return '<!-- Publicación preparada para Blogger. Etiquetas sugeridas: '+esc(labels.join(', '))+' -->\n'
       + paragraphs + '\n' + videoBlock + imageBlock;
   }
@@ -686,7 +682,6 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
     $('author').value = selectedRss.author || '';
     $('videoUrl').value = selectedRss.link || '';
     $('duration').value = selectedRss.duration || durationFromTitle(selectedRss.title) || '';
-    $('imageUrl').value = selectedRss.image || '';
     $('mp4Links').value = (selectedRss.enclosures || []).map(e => e.url).join('\n') || selectedRss.file || '';
     $('description').value = stripHtml(selectedRss.description);
     $('exportTitle').value = selectedRss.title;
