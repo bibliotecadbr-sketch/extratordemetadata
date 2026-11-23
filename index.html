@@ -217,7 +217,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   };
   function getVideoTypeKey(item) {
     const link = item.link || '';
-    const match = link.match(/mediaitems\\/([^/?#]+)/i);
+    const match = link.match(/mediaitems\/([^/?#]+)/i);
     return match ? decodeURIComponent(match[1]) : '';
   }
   function getVideoCatalog(item) {
