@@ -190,7 +190,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
       <button id="downloadHtml">Descargar HTML</button>
       <button class="secondary" id="copyHtml">Copiar HTML</button>
     </div>
-    <p class="small">El HTML para Blogger exporta únicamente la transcripción en párrafos justificados y tu imagen personalizada centrada al final en tamaño mediano. No incluye el título ni el enlace del video. Las etiquetas se generan por separado.</p>
+    <p class="small">El HTML para Blogger exporta la transcripción en párrafos justificados, la transcripción en un solo párrafo con saltos de línea, luego un párrafo independiente con el título enlazado y, debajo, tu imagen personalizada centrada en tamaño mediano. Las etiquetas se generan por separado.</p>
   </section>
   <footer>Generador de publicaciones JW.org para Blogger · Aplicación local e independiente · Imagen personalizada del usuario.</footer>
 </main>
@@ -606,13 +606,20 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}
   }
   function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function makeHtml(){
-    const title=$('exportTitle').value.trim()||$('title').value.trim()||'Transcripción JW.org';
-    const paragraphs=editor.value.trim().split(/\n\s*\n/).filter(Boolean)
-      .map(p=>'<p style="text-align: justify;"><span style="font-family: arial;">'+esc(p).replace(/\n/g,'<br />')+'</span></p>').join('\n');
+    const videoTitle=$('title').value.trim()||$('exportTitle').value.trim()||'Video JW.org';
+    const videoUrl=$('videoUrl').value.trim();
+    const transcript=editor.value.trim().replace(/\r\n?/g,'\n');
+    const transcriptBlock=transcript
+      ? '<p style="text-align: justify;"><span style="font-family: arial;">'+esc(transcript).replace(/\n/g,'<br />')+'</span></p>'
+      : '';
     const publicationImage='https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgjIIfs8OGIAq8v_aZx9zdfUO_sAK9uHTmJ0dealgP71dZdpKMnkqNqDYsMToKqpdt5aLVn-1f4VeHolri2M6_1VZZFVcSBxlvNY-iCETuYbkJYCZD1u6nb5bKJ6PTIqDt8oLUbhxQOnf_7yPHaTrpjhscT_9UHxjL4XOZohvwQaG64D4CCUqeu_vLtB-I/s1408/Gemini_Generated_Image_1lo27h1lo27h1lo2.jpg';
     const mediumImage=publicationImage.replace('/s1408/','/s320/');
-    const imageBlock='<div class="separator" style="clear: both;"><a href="'+publicationImage+'" style="display: block; padding: 1em 0px; text-align: center;"><img alt="" border="0" data-original-height="768" data-original-width="1408" src="'+mediumImage+'" style="width:320px;max-width:100%;height:auto;" width="320" /></a></div>';
-    return paragraphs + (paragraphs?'\n':'') + imageBlock;
+    const linkedTitle=videoUrl
+      ? '<a href="'+esc(videoUrl)+'" target="_blank">'+esc(videoTitle)+'</a>'
+      : esc(videoTitle);
+    const titleBlock='<p style="text-align: justify;"><span style="font-family: arial;">'+linkedTitle+'</span></p>';
+    const imageBlock='<div class="separator" style="clear: both;"><a href="'+publicationImage+'" style="display: block; padding: 1em 0px; text-align: center;"><img alt="" border="0" data-original-height="768" data-original-width="1408" src="'+mediumImage+'" style="height: auto; max-width: 100%; width: 320px;" width="320" /></a></div>';
+    return transcriptBlock+'\\n<p style="text-align: justify;"><span style="font-family: arial;"><br /></span></p>\\n'+titleBlock+'\\n'+imageBlock;
   }
 
   $('openVideo').addEventListener('click',()=>{const u=$('videoUrl').value.trim();if(!u){alert('Introduce primero el enlace del video.');return;}try{const x=new URL(u);if(!['http:','https:'].includes(x.protocol))throw 0;window.open(x.href,'_blank','noopener');}catch(e){alert('Introduce un enlace válido.');}});
